@@ -53,13 +53,30 @@ type Namespace struct {
 
 // Enter enters the namespace.
 func (ns *Namespace) Enter() error {
-    // TODO: implement
+    // Duplicate the namespace file descriptor to the standard input
+    if err := syscall.Dup2(int(ns.File.Fd()), syscall.Stdin); err != nil {
+        return fmt.Errorf("failed to duplicate file descriptor to stdin: %v", err)
+    }
+    
+    // Run the "sh" command as a new process with the "bash" shell
+    if err := exec.Command("/bin/sh", "-i").Run(); err != nil {
+        return fmt.Errorf("failed to start shell: %v", err)
+    }
+
+    return nil
 }
+
 
 // Close releases the namespace's resources.
 func (ns *Namespace) Close() error {
-    // TODO: implement
+    // Close the namespace file descriptor
+    if err := ns.File.Close(); err != nil {
+        return fmt.Errorf("failed to close namespace file: %v", err)
+    }
+
+    return nil
 }
+
 
 // NamespaceType is an enumeration of the different types of Linux namespaces.
 type NamespaceType int
@@ -82,5 +99,8 @@ type NamespaceSpec struct {
 
 // MustSetHostname sets the hostname of the current namespace.
 func MustSetHostname(hostname string) {
-    // TODO: implement
+    if err := syscall.Sethostname([]byte(hostname)); err != nil {
+        panic(fmt.Sprintf("failed to set hostname to %s: %v", hostname, err))
+    }
 }
+

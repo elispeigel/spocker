@@ -8,6 +8,7 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+    "fmt"
 )
 
 func TestNewFilesystem(t *testing.T) {
@@ -53,12 +54,16 @@ func TestMountUnmount(t *testing.T) {
         t.Fatal(err)
     }
     defer os.RemoveAll(root)
+    fmt.Println("root:", root)
+
 
     // Create a new Filesystem object
     fs, err := NewFilesystem(root)
     if err != nil {
         t.Fatal(err)
     }
+    fmt.Println("new fs:", fs)
+
 
     // Set up temporary directory for mount
     mount, err := ioutil.TempDir("", "test-mount")
@@ -66,6 +71,7 @@ func TestMountUnmount(t *testing.T) {
         t.Fatal(err)
     }
     defer os.RemoveAll(mount)
+    fmt.Println("mount dir:", mount)
 
     // Create a new Mount object
     m := &Mount{

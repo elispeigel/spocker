@@ -97,9 +97,11 @@ type NamespaceSpec struct {
     Type NamespaceType
 }
 
+
 // MustSetHostname sets the hostname of the current namespace.
 func MustSetHostname(hostname string) {
-    if err := syscall.Sethostname([]byte(hostname)); err != nil {
+    cmd := exec.Command("sudo", "hostnamectl", "set-hostname", hostname)
+    if err := cmd.Run(); err != nil {
         panic(fmt.Sprintf("failed to set hostname to %s: %v", hostname, err))
     }
 }

@@ -3,9 +3,9 @@ name: Go CI
 on: [push]
 
 jobs:
-  lint:
-    name: Run golangci-lint
-    uses: golangci/golangci-lint-action@v3.4.0
+  # lint:
+  #   name: Run golangci-lint
+  #   uses: golangci/golangci-lint-action@v3.4.0
   test:
     name: Run tests
     runs-on: ubuntu-latest

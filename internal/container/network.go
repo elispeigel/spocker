@@ -55,7 +55,9 @@ func CreateNetwork(config *NetworkConfig) (*Network, error) {
 			log.Fatal(err)
 		}
 
-		server.Serve()
+		if err := server.Serve(); err != nil {
+			return nil, fmt.Errorf("failed to start DHCP server: %v", err)
+		}
 	} else {
 		ip, err := GetAvailableIP(config.IPNet)
 		if err != nil {
@@ -114,7 +116,10 @@ func IsIPInUse(ip net.IP) bool {
 	if err != nil {
 		return true
 	}
-	conn.Close()
+	err = conn.Close()
+	if err != nil {
+		log.Printf("Failed to close connection for IP %v: %v", ip, err)
+	}
 	return false
 }
 

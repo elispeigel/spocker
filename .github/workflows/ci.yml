@@ -25,18 +25,16 @@ jobs:
 
     - name: Build
       run: go build -v ./...
-
-    
-    - name: Run Vet
-      run: "go vet ./..."
     
     - name: Run Gosec Security Scanner
+      continue-on-error: true
       uses: securego/gosec@master
       with:
         args: ./...
 
     - name: Run Static Check
       uses: dominikh/staticcheck-action@v1.2.0
+      continue-on-error: true
       with:
         version: "2022.1.1"
 

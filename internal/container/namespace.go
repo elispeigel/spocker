@@ -34,7 +34,6 @@ func NewNamespace(spec *NamespaceSpec) (*Namespace, error) {
 
 	// Read the namespace file descriptor from the pipe
 	file := os.NewFile(uintptr(r.Fd()), "namespace")
-	defer file.Close()
 
 	// Create a new namespace object
 	ns := &Namespace{
@@ -43,8 +42,12 @@ func NewNamespace(spec *NamespaceSpec) (*Namespace, error) {
 		File: file,
 	}
 
+	// Defer the file close method
+	defer file.Close()
+
 	return ns, nil
 }
+
 
 // Namespace is an abstraction over a Linux namespace.
 type Namespace struct {

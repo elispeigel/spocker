@@ -104,14 +104,21 @@ func (fs *Filesystem) CopyFile(src string, dst string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open source file %s: %v", src, err)
 	}
-	defer srcFile.Close()
+	errSrcClose := srcFile.Close()
+	if errSrcClose != nil {
+		return fmt.Errorf("failed to close source file %q: %v", src, errSrcClose)
+	}
 
 	// Create the destination file for writing
 	dstFile, err := os.Create(dstPath)
 	if err != nil {
 		return fmt.Errorf("failed to create destination file %s: %v", dst, err)
 	}
-	defer dstFile.Close()
+
+	errDstClose := dstFile.Close()
+	if errDstClose != nil {
+		return fmt.Errorf("failed to close destination file %q: %v", dst, errDstClose)
+	}
 
 	// Copy the contents of the source file to the destination file
 	_, err = io.Copy(dstFile, srcFile)

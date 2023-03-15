@@ -52,7 +52,7 @@ func TestMountUnmount(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(root)
+	// defer os.RemoveAll(root)
 	fmt.Println("root:", root)
 
 	// Create a new Filesystem object
@@ -67,7 +67,7 @@ func TestMountUnmount(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(mount)
+	// defer os.RemoveAll(mount)
 	fmt.Println("mount dir:", mount)
 
 	// Create a new Mount object

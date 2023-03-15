@@ -1,3 +1,4 @@
+// Package container provides functions for creating a container.
 package container
 
 import (
@@ -53,7 +54,7 @@ func CreateNetwork(config *NetworkConfig) (*Network, error) {
 		if err != nil {
 			log.Fatal(err)
 		}
-	
+
 		server.Serve()
 	} else {
 		ip, err := GetAvailableIP(config.IPNet)
@@ -161,56 +162,56 @@ func GetDefaultGateway(ipNet *net.IPNet) net.IP {
 
 // GetDefaultDNS returns the default DNS IP address.
 func GetDefaultDNS() net.IP {
-    // Open the resolv.conf file
-    file, err := os.Open("/etc/resolv.conf")
-    if err != nil {
-        log.Printf("Error opening resolv.conf: %v", err)
-        return nil
-    }
-    defer file.Close()
+	// Open the resolv.conf file
+	file, err := os.Open("/etc/resolv.conf")
+	if err != nil {
+		log.Printf("Error opening resolv.conf: %v", err)
+		return nil
+	}
+	defer file.Close()
 
-    // Read the file line by line
-    scanner := bufio.NewScanner(file)
-    for scanner.Scan() {
-        line := scanner.Text()
-        fields := strings.Fields(line)
+	// Read the file line by line
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		fields := strings.Fields(line)
 
-        // Look for the nameserver directive
-        if len(fields) >= 2 && fields[0] == "nameserver" {
-            ip := net.ParseIP(fields[1])
-            if ip != nil {
-                return ip
-            }
-        }
-    }
+		// Look for the nameserver directive
+		if len(fields) >= 2 && fields[0] == "nameserver" {
+			ip := net.ParseIP(fields[1])
+			if ip != nil {
+				return ip
+			}
+		}
+	}
 
-    if err := scanner.Err(); err != nil {
-        log.Printf("Error reading resolv.conf: %v", err)
-    }
+	if err := scanner.Err(); err != nil {
+		log.Printf("Error reading resolv.conf: %v", err)
+	}
 
-    return nil
+	return nil
 }
 
 // DeleteNetwork deletes an existing container network.
 func DeleteNetwork(networkName string) error {
-    iface, err := net.InterfaceByName(networkName)
-    if err != nil {
-        return err
-    }
+	iface, err := net.InterfaceByName(networkName)
+	if err != nil {
+		return err
+	}
 
-    link, err := netlink.LinkByIndex(iface.Index)
-    if err != nil {
-        return err
-    }
+	link, err := netlink.LinkByIndex(iface.Index)
+	if err != nil {
+		return err
+	}
 
-    err = netlink.LinkDel(link)
-    if err != nil {
-        return err
-    }
+	err = netlink.LinkDel(link)
+	if err != nil {
+		return err
+	}
 
-    log.Printf("Deleted network %s\n", networkName)
+	log.Printf("Deleted network %s\n", networkName)
 
-    return nil
+	return nil
 }
 
 // ConnectToNetwork connects the container to an existing network.
@@ -251,20 +252,18 @@ func ConnectToNetwork(containerID string, network *Network) error {
 		if err != nil {
 			return fmt.Errorf("failed to resolve DNS address: %v", err)
 		}
-	
+
 		udpConn, err := net.DialUDP("udp", nil, udpAddr)
 		if err != nil {
 			return fmt.Errorf("failed to create UDP connection to DNS server: %v", err)
 		}
 		defer udpConn.Close()
-	
+
 		message := []byte("Hello DNS server!")
 		if _, err := udpConn.Write(message); err != nil {
 			return fmt.Errorf("failed to send DNS message: %v", err)
 		}
 	}
-	
-	
 
 	log.Printf("Container %s connected to network %s", containerID, network.Name)
 
@@ -273,21 +272,21 @@ func ConnectToNetwork(containerID string, network *Network) error {
 
 // DisconnectFromNetwork disconnects a container from a network.
 func DisconnectFromNetwork(containerID, networkName string) error {
-    iface, err := net.InterfaceByName(networkName)
-    if err != nil {
-        return fmt.Errorf("network not found: %v", err)
-    }
+	iface, err := net.InterfaceByName(networkName)
+	if err != nil {
+		return fmt.Errorf("network not found: %v", err)
+	}
 
-    link, err := netlink.LinkByIndex(iface.Index)
-    if err != nil {
-        return fmt.Errorf("failed to get network link: %v", err)
-    }
+	link, err := netlink.LinkByIndex(iface.Index)
+	if err != nil {
+		return fmt.Errorf("failed to get network link: %v", err)
+	}
 
-    if err := netlink.LinkSetDown(link); err != nil {
-        return fmt.Errorf("failed to bring down network link: %v", err)
-    }
+	if err := netlink.LinkSetDown(link); err != nil {
+		return fmt.Errorf("failed to bring down network link: %v", err)
+	}
 
-    log.Printf("Container %s disconnected from network %s", containerID, networkName)
+	log.Printf("Container %s disconnected from network %s", containerID, networkName)
 
-    return nil
+	return nil
 }

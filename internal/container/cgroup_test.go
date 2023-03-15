@@ -1,10 +1,11 @@
+// Package container provides functions for creating a container.
 package container
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
-	"fmt"
 )
 
 func TestCgroup(t *testing.T) {

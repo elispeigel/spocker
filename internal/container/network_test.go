@@ -1,3 +1,4 @@
+// Package container provides functions for creating a container.
 package container
 
 import (
@@ -11,51 +12,51 @@ import (
 )
 
 func TestCreateNetwork(t *testing.T) {
-    // Test case 1: valid network configuration with static IP
-    config1 := &NetworkConfig{
-        Name:    "testnet1",
-        IPNet:   &net.IPNet{IP: net.ParseIP("192.168.0.0"), Mask: net.CIDRMask(24, 32)},
-        Gateway: net.ParseIP("192.168.0.1"),
-        DNS:     []net.IP{net.ParseIP("8.8.8.8")},
-        DHCP:    false,
-    }
-    net1, err1 := CreateNetwork(config1)
-    if err1 != nil {
-        t.Errorf("Test case 1 failed: %v", err1)
-    }
-    if net1.Name != "testnet1" || net1.IPNet.String() != "192.168.0.0/24" || net1.Gateway.String() != "192.168.0.1" || len(net1.DNS) != 1 || net1.DNS[0].String() != "8.8.8.8" || net1.DHCP {
-        t.Errorf("Test case 1 failed: incorrect network configuration")
-    }
+	// Test case 1: valid network configuration with static IP
+	config1 := &NetworkConfig{
+		Name:    "testnet1",
+		IPNet:   &net.IPNet{IP: net.ParseIP("192.168.0.0"), Mask: net.CIDRMask(24, 32)},
+		Gateway: net.ParseIP("192.168.0.1"),
+		DNS:     []net.IP{net.ParseIP("8.8.8.8")},
+		DHCP:    false,
+	}
+	net1, err1 := CreateNetwork(config1)
+	if err1 != nil {
+		t.Errorf("Test case 1 failed: %v", err1)
+	}
+	if net1.Name != "testnet1" || net1.IPNet.String() != "192.168.0.0/24" || net1.Gateway.String() != "192.168.0.1" || len(net1.DNS) != 1 || net1.DNS[0].String() != "8.8.8.8" || net1.DHCP {
+		t.Errorf("Test case 1 failed: incorrect network configuration")
+	}
 
-    // Test case 2: valid network configuration with DHCP
-    config2 := &NetworkConfig{
-        Name:     "testnet2",
-        IPNet:    &net.IPNet{IP: net.ParseIP("192.168.1.0"), Mask: net.CIDRMask(24, 32)},
-        Gateway:  net.ParseIP("192.168.1.1"),
-        DNS:      []net.IP{net.ParseIP("8.8.8.8")},
-        DHCP:     true,
-        DHCPArgs: []string{},
-    }
-    net2, err2 := CreateNetwork(config2)
-    if err2 != nil {
-        t.Errorf("Test case 2 failed: %v", err2)
-    }
-    if net2.Name != "testnet2" || net2.IPNet.String() != "192.168.1.0/24" || net2.Gateway.String() != "192.168.1.1" || len(net2.DNS) != 1 || net2.DNS[0].String() != "8.8.8.8" || !net2.DHCP {
-        t.Errorf("Test case 2 failed: incorrect network configuration")
-    }
+	// Test case 2: valid network configuration with DHCP
+	config2 := &NetworkConfig{
+		Name:     "testnet2",
+		IPNet:    &net.IPNet{IP: net.ParseIP("192.168.1.0"), Mask: net.CIDRMask(24, 32)},
+		Gateway:  net.ParseIP("192.168.1.1"),
+		DNS:      []net.IP{net.ParseIP("8.8.8.8")},
+		DHCP:     true,
+		DHCPArgs: []string{},
+	}
+	net2, err2 := CreateNetwork(config2)
+	if err2 != nil {
+		t.Errorf("Test case 2 failed: %v", err2)
+	}
+	if net2.Name != "testnet2" || net2.IPNet.String() != "192.168.1.0/24" || net2.Gateway.String() != "192.168.1.1" || len(net2.DNS) != 1 || net2.DNS[0].String() != "8.8.8.8" || !net2.DHCP {
+		t.Errorf("Test case 2 failed: incorrect network configuration")
+	}
 
-    // Test case 3: invalid network configuration
-    config3 := &NetworkConfig{
-        Name: "testnet3",
-        IPNet: &net.IPNet{
-            IP:   net.ParseIP("192.168.2.0"),
-            Mask: net.CIDRMask(24, 32),
-        },
-    }
-    _, err3 := CreateNetwork(config3)
-    if err3 == nil {
-        t.Errorf("Test case 3 failed: expected error but got nil")
-    }
+	// Test case 3: invalid network configuration
+	config3 := &NetworkConfig{
+		Name: "testnet3",
+		IPNet: &net.IPNet{
+			IP:   net.ParseIP("192.168.2.0"),
+			Mask: net.CIDRMask(24, 32),
+		},
+	}
+	_, err3 := CreateNetwork(config3)
+	if err3 == nil {
+		t.Errorf("Test case 3 failed: expected error but got nil")
+	}
 }
 
 func TestGetAvailableIP(t *testing.T) {
@@ -128,213 +129,212 @@ func TestGetDefaultGateway(t *testing.T) {
 }
 
 func TestGetDefaultDNS(t *testing.T) {
-    // Create a temporary file with sample data
-    content := []byte("nameserver 8.8.8.8\nnameserver 8.8.4.4\n")
-    tmpfile, err := ioutil.TempFile("", "resolv.conf")
-    if err != nil {
-        t.Fatalf("Failed to create temporary file: %v", err)
-    }
-    defer os.Remove(tmpfile.Name())
-    if _, err := tmpfile.Write(content); err != nil {
-        t.Fatalf("Failed to write to temporary file: %v", err)
-    }
-    if err := tmpfile.Close(); err != nil {
-        t.Fatalf("Failed to close temporary file: %v", err)
-    }
+	// Create a temporary file with sample data
+	content := []byte("nameserver 8.8.8.8\nnameserver 8.8.4.4\n")
+	tmpfile, err := ioutil.TempFile("", "resolv.conf")
+	if err != nil {
+		t.Fatalf("Failed to create temporary file: %v", err)
+	}
+	defer os.Remove(tmpfile.Name())
+	if _, err := tmpfile.Write(content); err != nil {
+		t.Fatalf("Failed to write to temporary file: %v", err)
+	}
+	if err := tmpfile.Close(); err != nil {
+		t.Fatalf("Failed to close temporary file: %v", err)
+	}
 
-    // Test the GetDefaultDNS function with the temporary file
-    expected := net.ParseIP("8.8.8.8")
-    actual := GetDefaultDNS()
-    if actual == nil {
-        t.Errorf("GetDefaultDNS returned nil")
-    } else if !actual.Equal(expected) {
-        t.Errorf("GetDefaultDNS returned %v, expected %v", actual, expected)
-    }
+	// Test the GetDefaultDNS function with the temporary file
+	expected := net.ParseIP("8.8.8.8")
+	actual := GetDefaultDNS()
+	if actual == nil {
+		t.Errorf("GetDefaultDNS returned nil")
+	} else if !actual.Equal(expected) {
+		t.Errorf("GetDefaultDNS returned %v, expected %v", actual, expected)
+	}
 }
 
 func TestDeleteNetwork(t *testing.T) {
-    // Create a virtual network interface to use for the test
-    ifName := "testnet"
-    err := createTestNetwork(ifName)
-    if err != nil {
-        t.Fatalf("Failed to create test network: %v", err)
-    }
-    defer func() {
-        // Clean up the test network after the test
-        err := DeleteNetwork(ifName)
-        if err != nil {
-            t.Fatalf("Failed to delete test network: %v", err)
-        }
-    }()
+	// Create a virtual network interface to use for the test
+	ifName := "testnet"
+	err := createTestNetwork(ifName)
+	if err != nil {
+		t.Fatalf("Failed to create test network: %v", err)
+	}
+	defer func() {
+		// Clean up the test network after the test
+		err := DeleteNetwork(ifName)
+		if err != nil {
+			t.Fatalf("Failed to delete test network: %v", err)
+		}
+	}()
 
-    // Call the function to be tested
-    err = DeleteNetwork(ifName)
+	// Call the function to be tested
+	err = DeleteNetwork(ifName)
 
-    // Check that the error returned is nil
-    if err != nil {
-        t.Errorf("DeleteNetwork(%s) returned error: %v", ifName, err)
-    }
+	// Check that the error returned is nil
+	if err != nil {
+		t.Errorf("DeleteNetwork(%s) returned error: %v", ifName, err)
+	}
 
-    // Check that the network interface was actually deleted
-    _, err = net.InterfaceByName(ifName)
-    if err == nil {
-        t.Errorf("Network interface %s still exists after calling DeleteNetwork", ifName)
-    }
+	// Check that the network interface was actually deleted
+	_, err = net.InterfaceByName(ifName)
+	if err == nil {
+		t.Errorf("Network interface %s still exists after calling DeleteNetwork", ifName)
+	}
 }
 
 // Helper function to create a virtual network interface for testing
 func createTestNetwork(ifName string) error {
-    link := &netlink.Dummy{
-        LinkAttrs: netlink.LinkAttrs{
-            Name: ifName,
-        },
-    }
-    err := netlink.LinkAdd(link)
-    if err != nil {
-        return err
-    }
-    return nil
+	link := &netlink.Dummy{
+		LinkAttrs: netlink.LinkAttrs{
+			Name: ifName,
+		},
+	}
+	err := netlink.LinkAdd(link)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func TestConnectToNetwork(t *testing.T) {
-    networkName := "test_network"
-    err := createTestNetwork(networkName)
-    if err != nil {
-        t.Fatalf("Failed to create test network: %v", err)
-    }
+	networkName := "test_network"
+	err := createTestNetwork(networkName)
+	if err != nil {
+		t.Fatalf("Failed to create test network: %v", err)
+	}
 
-    containerID := "test_container"
-    ipNet := &net.IPNet{
-        IP:   net.IPv4(192, 168, 0, 2),
-        Mask: net.CIDRMask(24, 32),
-    }
-    network := &Network{
-        Name:    networkName,
-        IPNet:   ipNet,
-        Gateway: net.ParseIP("192.168.0.1"),
-        DNS:     []net.IP{net.ParseIP("8.8.8.8")},
-    }
+	containerID := "test_container"
+	ipNet := &net.IPNet{
+		IP:   net.IPv4(192, 168, 0, 2),
+		Mask: net.CIDRMask(24, 32),
+	}
+	network := &Network{
+		Name:    networkName,
+		IPNet:   ipNet,
+		Gateway: net.ParseIP("192.168.0.1"),
+		DNS:     []net.IP{net.ParseIP("8.8.8.8")},
+	}
 
-    err = ConnectToNetwork(containerID, network)
-    if err != nil {
-        t.Fatalf("Failed to connect container %s to network %s: %v", containerID, networkName, err)
-    }
+	err = ConnectToNetwork(containerID, network)
+	if err != nil {
+		t.Fatalf("Failed to connect container %s to network %s: %v", containerID, networkName, err)
+	}
 
-    // Check that the container is assigned the correct IP address
-    addrs, err := netlink.AddrList(nil, netlink.FAMILY_ALL)
-    if err != nil {
-        t.Fatalf("Failed to get address list: %v", err)
-    }
-    var found bool
-    for _, addr := range addrs {
-        if addr.IPNet.String() == network.IPNet.String() {
-            found = true
-            break
-        }
-    }
-    if !found {
-        t.Fatalf("IP address %s not found in address list after connecting to network", network.IPNet.String())
-    }
+	// Check that the container is assigned the correct IP address
+	addrs, err := netlink.AddrList(nil, netlink.FAMILY_ALL)
+	if err != nil {
+		t.Fatalf("Failed to get address list: %v", err)
+	}
+	var found bool
+	for _, addr := range addrs {
+		if addr.IPNet.String() == network.IPNet.String() {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("IP address %s not found in address list after connecting to network", network.IPNet.String())
+	}
 
-    // Check that the default route is set up correctly
-    routes, err := netlink.RouteList(nil, netlink.FAMILY_ALL)
-    if err != nil {
-        t.Fatalf("Failed to get route list: %v", err)
-    }
-    var gwFound bool
-    for _, route := range routes {
-        if route.Dst == nil && route.Gw != nil && route.Gw.String() == network.Gateway.String() {
-            gwFound = true
-            break
-        }
-    }
-    if !gwFound {
-        t.Fatalf("Default route to gateway %s not found in route list after connecting to network", network.Gateway.String())
-    }
+	// Check that the default route is set up correctly
+	routes, err := netlink.RouteList(nil, netlink.FAMILY_ALL)
+	if err != nil {
+		t.Fatalf("Failed to get route list: %v", err)
+	}
+	var gwFound bool
+	for _, route := range routes {
+		if route.Dst == nil && route.Gw != nil && route.Gw.String() == network.Gateway.String() {
+			gwFound = true
+			break
+		}
+	}
+	if !gwFound {
+		t.Fatalf("Default route to gateway %s not found in route list after connecting to network", network.Gateway.String())
+	}
 
-    // Check that DNS is reachable
-    conn, err := net.Dial("udp", fmt.Sprintf("%s:53", network.DNS[0].String()))
-    if err != nil {
-        t.Fatalf("Failed to connect to DNS %s: %v", network.DNS[0].String(), err)
-    }
-    conn.Close()
+	// Check that DNS is reachable
+	conn, err := net.Dial("udp", fmt.Sprintf("%s:53", network.DNS[0].String()))
+	if err != nil {
+		t.Fatalf("Failed to connect to DNS %s: %v", network.DNS[0].String(), err)
+	}
+	conn.Close()
 
-    err = DisconnectFromNetwork(containerID, network.Name)
-    if err != nil {
-        t.Fatalf("Failed to disconnect container %s from network %s: %v", containerID, networkName, err)
-    }
+	err = DisconnectFromNetwork(containerID, network.Name)
+	if err != nil {
+		t.Fatalf("Failed to disconnect container %s from network %s: %v", containerID, networkName, err)
+	}
 }
 
-
 func TestDisconnectFromNetwork(t *testing.T) {
-    networkName := "test_network"
-    err := createTestNetwork(networkName)
-    if err != nil {
-        t.Fatalf("Failed to create test network: %v", err)
-    }
+	networkName := "test_network"
+	err := createTestNetwork(networkName)
+	if err != nil {
+		t.Fatalf("Failed to create test network: %v", err)
+	}
 
-    iface, err := net.InterfaceByName(networkName)
-    if err != nil {
-        t.Fatalf("Failed to get interface %s: %v", networkName, err)
-    }
+	iface, err := net.InterfaceByName(networkName)
+	if err != nil {
+		t.Fatalf("Failed to get interface %s: %v", networkName, err)
+	}
 
-    containerID := "test_container"
-    ipNet := &net.IPNet{
-        IP:   net.IPv4(192, 168, 0, 2),
-        Mask: net.CIDRMask(24, 32),
-    }
-    network := &Network{
-        Name:    networkName,
-        IPNet:   ipNet,
-        Gateway: net.ParseIP("192.168.0.1"),
-        DNS:     []net.IP{net.ParseIP("8.8.8.8")},
-    }
+	containerID := "test_container"
+	ipNet := &net.IPNet{
+		IP:   net.IPv4(192, 168, 0, 2),
+		Mask: net.CIDRMask(24, 32),
+	}
+	network := &Network{
+		Name:    networkName,
+		IPNet:   ipNet,
+		Gateway: net.ParseIP("192.168.0.1"),
+		DNS:     []net.IP{net.ParseIP("8.8.8.8")},
+	}
 
-    err = ConnectToNetwork(containerID, network)
-    if err != nil {
-        t.Fatalf("Failed to connect container %s to network %s: %v", containerID, networkName, err)
-    }
+	err = ConnectToNetwork(containerID, network)
+	if err != nil {
+		t.Fatalf("Failed to connect container %s to network %s: %v", containerID, networkName, err)
+	}
 
-    err = DisconnectFromNetwork(containerID, network.Name)
-    if err != nil {
-        t.Fatalf("Failed to disconnect container %s from network %s: %v", containerID, networkName, err)
-    }
+	err = DisconnectFromNetwork(containerID, network.Name)
+	if err != nil {
+		t.Fatalf("Failed to disconnect container %s from network %s: %v", containerID, networkName, err)
+	}
 
-    link, err := netlink.LinkByIndex(iface.Index)
-    if err != nil {
-        t.Fatalf("Failed to get link by index %d: %v", iface.Index, err)
-    }
+	link, err := netlink.LinkByIndex(iface.Index)
+	if err != nil {
+		t.Fatalf("Failed to get link by index %d: %v", iface.Index, err)
+	}
 
-    // Check that the IP address was removed from the interface
-    addrs, err := netlink.AddrList(link, netlink.FAMILY_ALL)
-    if err != nil {
-        t.Fatalf("Failed to get address list for link %s: %v", link.Attrs().Name, err)
-    }
-    for _, addr := range addrs {
-        if addr.IPNet.String() == network.IPNet.String() {
-            t.Fatalf("IP address %s was not removed from interface %s", addr.IPNet.String(), link.Attrs().Name)
-        }
-    }
+	// Check that the IP address was removed from the interface
+	addrs, err := netlink.AddrList(link, netlink.FAMILY_ALL)
+	if err != nil {
+		t.Fatalf("Failed to get address list for link %s: %v", link.Attrs().Name, err)
+	}
+	for _, addr := range addrs {
+		if addr.IPNet.String() == network.IPNet.String() {
+			t.Fatalf("IP address %s was not removed from interface %s", addr.IPNet.String(), link.Attrs().Name)
+		}
+	}
 
-    // Check that the default route was removed
-    routes, err := netlink.RouteList(link, netlink.FAMILY_ALL)
-    if err != nil {
-        t.Fatalf("Failed to get route list for link %s: %v", link.Attrs().Name, err)
-    }
-    for _, route := range routes {
-        if route.Gw != nil && route.Gw.String() == network.Gateway.String() {
-            t.Fatalf("Default route to gateway %s was not removed from interface %s", route.Gw.String(), link.Attrs().Name)
-        }
-    }
+	// Check that the default route was removed
+	routes, err := netlink.RouteList(link, netlink.FAMILY_ALL)
+	if err != nil {
+		t.Fatalf("Failed to get route list for link %s: %v", link.Attrs().Name, err)
+	}
+	for _, route := range routes {
+		if route.Gw != nil && route.Gw.String() == network.Gateway.String() {
+			t.Fatalf("Default route to gateway %s was not removed from interface %s", route.Gw.String(), link.Attrs().Name)
+		}
+	}
 
-    // Check that DNS is no longer reachable
-    udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", network.DNS[0].String(), 53))
-    if err != nil {
-        t.Fatalf("Failed to resolve UDP address for DNS %s: %v", network.DNS[0].String(), err)
-    }
+	// Check that DNS is no longer reachable
+	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", network.DNS[0].String(), 53))
+	if err != nil {
+		t.Fatalf("Failed to resolve UDP address for DNS %s: %v", network.DNS[0].String(), err)
+	}
 
-    _, err = net.DialUDP("udp", nil, udpAddr)
-    if err == nil {
-        t.Fatalf("DNS %s is still reachable after disconnection", network.DNS[0].String())
-    }
+	_, err = net.DialUDP("udp", nil, udpAddr)
+	if err == nil {
+		t.Fatalf("DNS %s is still reachable after disconnection", network.DNS[0].String())
+	}
 }

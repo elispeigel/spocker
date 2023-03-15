@@ -1,14 +1,15 @@
+// Package container provides functions for creating a container.
 package container
 
 import (
 	"bufio"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
-    "fmt"
 )
 
 func TestNewFilesystem(t *testing.T) {
@@ -46,111 +47,108 @@ func TestNewFilesystem(t *testing.T) {
 	}
 }
 
-
 func TestMountUnmount(t *testing.T) {
-    // Set up temporary directory for root
-    root, err := ioutil.TempDir("", "test-root")
-    if err != nil {
-        t.Fatal(err)
-    }
-    defer os.RemoveAll(root)
-    fmt.Println("root:", root)
+	// Set up temporary directory for root
+	root, err := ioutil.TempDir("", "test-root")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(root)
+	fmt.Println("root:", root)
 
+	// Create a new Filesystem object
+	fs, err := NewFilesystem(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println("new fs:", fs)
 
-    // Create a new Filesystem object
-    fs, err := NewFilesystem(root)
-    if err != nil {
-        t.Fatal(err)
-    }
-    fmt.Println("new fs:", fs)
+	// Set up temporary directory for mount
+	mount, err := ioutil.TempDir("", "test-mount")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(mount)
+	fmt.Println("mount dir:", mount)
 
+	// Create a new Mount object
+	m := &Mount{
+		Source: "tmpfs",
+		Target: mount,
+		FSType: "tmpfs",
+		Flags:  syscall.MS_NOSUID,
+	}
 
-    // Set up temporary directory for mount
-    mount, err := ioutil.TempDir("", "test-mount")
-    if err != nil {
-        t.Fatal(err)
-    }
-    defer os.RemoveAll(mount)
-    fmt.Println("mount dir:", mount)
+	// Mount the filesystem
+	if err := fs.Mount(m); err != nil {
+		t.Fatalf("failed to mount filesystem: %v", err)
+	}
 
-    // Create a new Mount object
-    m := &Mount{
-        Source: "tmpfs",
-        Target: mount,
-        FSType: "tmpfs",
-        Flags:  syscall.MS_NOSUID,
-    }
+	// Check if the mountpoint is actually mounted
+	if !isMounted(mount) {
+		t.Errorf("mountpoint %s is not mounted", mount)
+	}
 
-    // Mount the filesystem
-    if err := fs.Mount(m); err != nil {
-        t.Fatalf("failed to mount filesystem: %v", err)
-    }
+	// Unmount the filesystem
+	if err := fs.Unmount(mount); err != nil {
+		t.Fatalf("failed to unmount filesystem: %v", err)
+	}
 
-    // Check if the mountpoint is actually mounted
-    if !isMounted(mount) {
-        t.Errorf("mountpoint %s is not mounted", mount)
-    }
-
-    // Unmount the filesystem
-    if err := fs.Unmount(mount); err != nil {
-        t.Fatalf("failed to unmount filesystem: %v", err)
-    }
-
-    // Check if the mountpoint is actually unmounted
-    if isMounted(mount) {
-        t.Errorf("mountpoint %s is still mounted", mount)
-    }
+	// Check if the mountpoint is actually unmounted
+	if isMounted(mount) {
+		t.Errorf("mountpoint %s is still mounted", mount)
+	}
 }
 
 // isMounted checks if the given mountpoint is currently mounted.
 func isMounted(mountpoint string) bool {
-    f, err := os.Open("/proc/mounts")
-    if err != nil {
-        return false
-    }
-    defer f.Close()
+	f, err := os.Open("/proc/mounts")
+	if err != nil {
+		return false
+	}
+	defer f.Close()
 
-    scanner := bufio.NewScanner(f)
-    for scanner.Scan() {
-        fields := strings.Fields(scanner.Text())
-        if len(fields) < 2 {
-            continue
-        }
-        if fields[1] == mountpoint {
-            return true
-        }
-    }
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) < 2 {
+			continue
+		}
+		if fields[1] == mountpoint {
+			return true
+		}
+	}
 
-    return false
+	return false
 }
 
 func TestCreateRemoveDir(t *testing.T) {
-    // Set up temporary directory for filesystem
-    root, err := ioutil.TempDir("", "test-filesystem")
-    if err != nil {
-        t.Fatal(err)
-    }
-    defer os.RemoveAll(root)
+	// Set up temporary directory for filesystem
+	root, err := ioutil.TempDir("", "test-filesystem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(root)
 
-    // Create new Filesystem object with temporary directory as root
-    fs := &Filesystem{Root: root}
+	// Create new Filesystem object with temporary directory as root
+	fs := &Filesystem{Root: root}
 
-    // Create a directory and verify that it was created
-    dirPath := "test-dir"
-    if err := fs.CreateDir(dirPath); err != nil {
-        t.Fatalf("failed to create directory: %v", err)
-    }
-    if _, err := os.Stat(filepath.Join(fs.Root, dirPath)); err != nil {
-        t.Fatalf("directory not found: %v", err)
-    }
+	// Create a directory and verify that it was created
+	dirPath := "test-dir"
+	if err := fs.CreateDir(dirPath); err != nil {
+		t.Fatalf("failed to create directory: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(fs.Root, dirPath)); err != nil {
+		t.Fatalf("directory not found: %v", err)
+	}
 
-    // Remove the directory and verify that it was removed
-    if err := fs.RemoveDir(dirPath); err != nil {
-        t.Fatalf("failed to remove directory: %v", err)
-    }
-    if _, err := os.Stat(filepath.Join(fs.Root, dirPath)); !os.IsNotExist(err) {
-        t.Fatalf("directory still exists after removal")
-    }
+	// Remove the directory and verify that it was removed
+	if err := fs.RemoveDir(dirPath); err != nil {
+		t.Fatalf("failed to remove directory: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(fs.Root, dirPath)); !os.IsNotExist(err) {
+		t.Fatalf("directory still exists after removal")
+	}
 }
 
 func TestCreateRemoveFile(t *testing.T) {
@@ -228,116 +226,116 @@ func TestCopyFile(t *testing.T) {
 }
 
 func TestSetFileOwnership(t *testing.T) {
-    // Create a temporary directory to use for the filesystem root
-    rootDir, err := ioutil.TempDir("", "fs-test")
-    if err != nil {
-        t.Fatalf("failed to create temp dir: %v", err)
-    }
-    defer os.RemoveAll(rootDir)
+	// Create a temporary directory to use for the filesystem root
+	rootDir, err := ioutil.TempDir("", "fs-test")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(rootDir)
 
-    // Create a new filesystem object
-    fs, err := NewFilesystem(rootDir)
-    if err != nil {
-        t.Fatalf("failed to create filesystem: %v", err)
-    }
+	// Create a new filesystem object
+	fs, err := NewFilesystem(rootDir)
+	if err != nil {
+		t.Fatalf("failed to create filesystem: %v", err)
+	}
 
-    // Create a test file
-    testFilePath := "testfile"
-    testFile, err := fs.CreateFile(testFilePath)
-    if err != nil {
-        t.Fatalf("failed to create test file: %v", err)
-    }
-    testFile.Close()
+	// Create a test file
+	testFilePath := "testfile"
+	testFile, err := fs.CreateFile(testFilePath)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+	testFile.Close()
 
-    // Set ownership of test file
-    uid := 1000
-    gid := 1000
-    err = fs.SetFileOwnership(testFilePath, uid, gid)
-    if err != nil {
-        t.Errorf("failed to set file ownership: %v", err)
-    }
+	// Set ownership of test file
+	uid := 1000
+	gid := 1000
+	err = fs.SetFileOwnership(testFilePath, uid, gid)
+	if err != nil {
+		t.Errorf("failed to set file ownership: %v", err)
+	}
 
-    // Check ownership of test file
-    fileInfo, err := os.Stat(filepath.Join(fs.Root, testFilePath))
-    if err != nil {
-        t.Errorf("failed to get file info: %v", err)
-    }
-    stat := fileInfo.Sys().(*syscall.Stat_t)
-    if int(stat.Uid) != uid || int(stat.Gid) != gid {
-        t.Errorf("file ownership not set correctly, expected uid %d and gid %d, got uid %d and gid %d",
-            uid, gid, int(stat.Uid), int(stat.Gid))
-    }
+	// Check ownership of test file
+	fileInfo, err := os.Stat(filepath.Join(fs.Root, testFilePath))
+	if err != nil {
+		t.Errorf("failed to get file info: %v", err)
+	}
+	stat := fileInfo.Sys().(*syscall.Stat_t)
+	if int(stat.Uid) != uid || int(stat.Gid) != gid {
+		t.Errorf("file ownership not set correctly, expected uid %d and gid %d, got uid %d and gid %d",
+			uid, gid, int(stat.Uid), int(stat.Gid))
+	}
 }
 
 func TestSetFilePermissions(t *testing.T) {
-    // Create a temporary directory to use for the filesystem root
-    rootDir, err := ioutil.TempDir("", "fs-test")
-    if err != nil {
-        t.Fatalf("failed to create temp dir: %v", err)
-    }
-    defer os.RemoveAll(rootDir)
+	// Create a temporary directory to use for the filesystem root
+	rootDir, err := ioutil.TempDir("", "fs-test")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(rootDir)
 
-    // Create a new filesystem object
-    fs, err := NewFilesystem(rootDir)
-    if err != nil {
-        t.Fatalf("failed to create filesystem: %v", err)
-    }
+	// Create a new filesystem object
+	fs, err := NewFilesystem(rootDir)
+	if err != nil {
+		t.Fatalf("failed to create filesystem: %v", err)
+	}
 
-    // Create a test file
-    testFilePath := "testfile"
-    testFile, err := fs.CreateFile(testFilePath)
-    if err != nil {
-        t.Fatalf("failed to create test file: %v", err)
-    }
-    testFile.Close()
+	// Create a test file
+	testFilePath := "testfile"
+	testFile, err := fs.CreateFile(testFilePath)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+	testFile.Close()
 
-    // Set permissions of test file
-    permissions := os.FileMode(0644)
-    err = fs.SetFilePermissions(testFilePath, permissions)
-    if err != nil {
-        t.Errorf("failed to set file permissions: %v", err)
-    }
+	// Set permissions of test file
+	permissions := os.FileMode(0644)
+	err = fs.SetFilePermissions(testFilePath, permissions)
+	if err != nil {
+		t.Errorf("failed to set file permissions: %v", err)
+	}
 
-    // Check permissions of test file
-    fileInfo, err := os.Stat(filepath.Join(fs.Root, testFilePath))
-    if err != nil {
-        t.Errorf("failed to get file info: %v", err)
-    }
-    if fileInfo.Mode().Perm() != permissions {
-        t.Errorf("file permissions not set correctly, expected %s, got %s",
-            permissions.String(), fileInfo.Mode().Perm().String())
-    }
+	// Check permissions of test file
+	fileInfo, err := os.Stat(filepath.Join(fs.Root, testFilePath))
+	if err != nil {
+		t.Errorf("failed to get file info: %v", err)
+	}
+	if fileInfo.Mode().Perm() != permissions {
+		t.Errorf("file permissions not set correctly, expected %s, got %s",
+			permissions.String(), fileInfo.Mode().Perm().String())
+	}
 }
 
 func TestGetAbsolutePath(t *testing.T) {
-    // Create a new filesystem with a root directory
-    fs, err := NewFilesystem("/tmp")
+	// Create a new filesystem with a root directory
+	fs, err := NewFilesystem("/tmp")
 	if err != nil {
-        t.Errorf("NewFilesystem failed with error: %v", err)
-    }
-    // Test that an absolute path is returned for a relative path
-    absPath, err := fs.GetAbsolutePath("file.txt")
-    if err != nil {
-        t.Errorf("GetAbsolutePath failed with error: %v", err)
-    }
-    expectedPath := "/tmp/file.txt"
-    if absPath != expectedPath {
-        t.Errorf("GetAbsolutePath returned %s, expected %s", absPath, expectedPath)
-    }
+		t.Errorf("NewFilesystem failed with error: %v", err)
+	}
+	// Test that an absolute path is returned for a relative path
+	absPath, err := fs.GetAbsolutePath("file.txt")
+	if err != nil {
+		t.Errorf("GetAbsolutePath failed with error: %v", err)
+	}
+	expectedPath := "/tmp/file.txt"
+	if absPath != expectedPath {
+		t.Errorf("GetAbsolutePath returned %s, expected %s", absPath, expectedPath)
+	}
 
-    // Test that an absolute path is returned for an absolute path
-    absPath, err = fs.GetAbsolutePath("/var/log")
-    if err != nil {
-        t.Errorf("GetAbsolutePath failed with error: %v", err)
-    }
-    expectedPath = "/var/log"
-    if absPath != expectedPath {
-        t.Errorf("GetAbsolutePath returned %s, expected %s", absPath, expectedPath)
-    }
+	// Test that an absolute path is returned for an absolute path
+	absPath, err = fs.GetAbsolutePath("/var/log")
+	if err != nil {
+		t.Errorf("GetAbsolutePath failed with error: %v", err)
+	}
+	expectedPath = "/var/log"
+	if absPath != expectedPath {
+		t.Errorf("GetAbsolutePath returned %s, expected %s", absPath, expectedPath)
+	}
 
-    // Test that an error is returned for a non-existent path
-    _, err = fs.GetAbsolutePath("nonexistent/file.txt")
-    if err == nil {
-        t.Errorf("GetAbsolutePath should have returned an error for non-existent path")
-    }
+	// Test that an error is returned for a non-existent path
+	_, err = fs.GetAbsolutePath("nonexistent/file.txt")
+	if err == nil {
+		t.Errorf("GetAbsolutePath should have returned an error for non-existent path")
+	}
 }

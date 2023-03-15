@@ -1,3 +1,4 @@
+// Package container provides functions for creating a container.
 package container
 
 import (

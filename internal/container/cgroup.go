@@ -1,16 +1,17 @@
+// Package container provides functions for creating a container.
 package container
 
 import (
-    "os"
-    "path/filepath"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 )
 
 // NewCgroup returns a new cgroup object.
 func NewCgroup(spec *CgroupSpec) (*Cgroup, error) {
-	subsystems := []string{"cpu", "memory"} // List of subsystems to use for the cgroup
-	cgroupRoot := "/sys/fs/cgroup"         // Root directory for cgroups
+	subsystems := []string{"cpu", "memory"}            // List of subsystems to use for the cgroup
+	cgroupRoot := "/sys/fs/cgroup"                     // Root directory for cgroups
 	cgroupPath := filepath.Join(cgroupRoot, spec.Name) // Path to the cgroup directory
 
 	// Create the cgroup directory if it doesn't exist
@@ -62,66 +63,65 @@ func NewCgroup(spec *CgroupSpec) (*Cgroup, error) {
 	}, nil
 }
 
-
-
 // Cgroup is an abstraction over a Linux control group.
 type Cgroup struct {
-    Name string
-    File *os.File
+	Name string
+	File *os.File
 }
 
 // Set sets the value of the specified control.
 func (cg *Cgroup) Set(control string, value string) error {
-    controlFile := filepath.Join("/sys/fs/cgroup", cg.Name, control)
-    f, err := os.OpenFile(controlFile, os.O_WRONLY|os.O_TRUNC, 0644)
-    if err != nil {
-        return fmt.Errorf("failed to open control file %s: %v", controlFile, err)
-    }
-    defer f.Close()
+	controlFile := filepath.Join("/sys/fs/cgroup", cg.Name, control)
+	f, err := os.OpenFile(controlFile, os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open control file %s: %v", controlFile, err)
+	}
+	defer f.Close()
 
-    if _, err := f.WriteString(value); err != nil {
-        return fmt.Errorf("failed to write value to control file %s: %v", controlFile, err)
-    }
+	if _, err := f.WriteString(value); err != nil {
+		return fmt.Errorf("failed to write value to control file %s: %v", controlFile, err)
+	}
 
-    return nil
+	return nil
 }
 
 // Close releases the cgroup's resources.
 func (cg *Cgroup) Close() error {
-    // Close the namespace file descriptor
-    if err := cg.File.Close(); err != nil {
-        return fmt.Errorf("failed to close cgroup file: %v", err)
-    }
+	// Close the namespace file descriptor
+	if err := cg.File.Close(); err != nil {
+		return fmt.Errorf("failed to close cgroup file: %v", err)
+	}
 
-    return nil
+	return nil
 }
 
 // CgroupSpec represents the specification for a Linux control group.
 type CgroupSpec struct {
-    Name      string
-    Resources *Resources
+	Name      string
+	Resources *Resources
 }
 
+// The Resources struct contains a Memory struct that represents the memory resource allocation for a Linux control group.
 type Resources struct {
-    Memory *Memory
+	Memory *Memory
 }
 
+// Memory struct that represents the memory resource allocation for a Linux control group
 type Memory struct {
-    Limit int
+	Limit int
 }
 
 // MustLimitMemory limits the memory usage of the current process.
 func MustLimitMemory(maxMemory int64) {
-    const memoryLimitControl = "memory.limit_in_bytes"
-    cgroupSpec := &CgroupSpec{Name: "container"}
-    cgroup, err := NewCgroup(cgroupSpec)
-    if err != nil {
-        log.Fatalf("failed to create cgroup: %v", err)
-    }
-    defer cgroup.Close()
+	const memoryLimitControl = "memory.limit_in_bytes"
+	cgroupSpec := &CgroupSpec{Name: "container"}
+	cgroup, err := NewCgroup(cgroupSpec)
+	if err != nil {
+		log.Fatalf("failed to create cgroup: %v", err)
+	}
+	defer cgroup.Close()
 
-    if err := cgroup.Set(memoryLimitControl, fmt.Sprintf("%d", maxMemory)); err != nil {
-        log.Fatalf("failed to set %s for cgroup %s: %v", memoryLimitControl, cgroupSpec.Name, err)
-    }
+	if err := cgroup.Set(memoryLimitControl, fmt.Sprintf("%d", maxMemory)); err != nil {
+		log.Fatalf("failed to set %s for cgroup %s: %v", memoryLimitControl, cgroupSpec.Name, err)
+	}
 }
-

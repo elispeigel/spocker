@@ -15,7 +15,7 @@ func NewCgroup(spec *CgroupSpec) (*Cgroup, error) {
 	cgroupPath := filepath.Join(cgroupRoot, spec.Name) // Path to the cgroup directory
 
 	// Create the cgroup directory if it doesn't exist
-	if err := os.MkdirAll(cgroupPath, 0755); err != nil {
+	if err := os.MkdirAll(cgroupPath, 0777); err != nil {
 		return nil, fmt.Errorf("failed to create cgroup directory %q: %v", cgroupPath, err)
 	}
 

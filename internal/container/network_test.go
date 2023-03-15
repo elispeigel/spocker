@@ -3,11 +3,9 @@ package container
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"testing"
-
 	"github.com/vishvananda/netlink"
 )
 
@@ -131,7 +129,7 @@ func TestGetDefaultGateway(t *testing.T) {
 func TestGetDefaultDNS(t *testing.T) {
 	// Create a temporary file with sample data
 	content := []byte("nameserver 8.8.8.8\nnameserver 8.8.4.4\n")
-	tmpfile, err := ioutil.TempFile("", "resolv.conf")
+	tmpfile, err := os.CreateTemp("", "resolv.conf")
 	if err != nil {
 		t.Fatalf("Failed to create temporary file: %v", err)
 	}

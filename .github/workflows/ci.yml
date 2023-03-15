@@ -32,11 +32,5 @@ jobs:
       with:
         args: ./...
 
-    - name: Run Static Check
-      uses: dominikh/staticcheck-action@v1.2.0
-      continue-on-error: true
-      with:
-        version: "2022.1.1"
-
     - name: Test
       run: go test -v ./...

@@ -25,9 +25,9 @@ func NewCgroup(spec *CgroupSpec) (*Cgroup, error) {
 		return nil, fmt.Errorf("failed to create tasks file for cgroup %q: %v", spec.Name, err)
 	}
 	errClose := tasksFile.Close()
-    if errClose != nil {
-        return nil, fmt.Errorf("failed to close tasks file for cgroup %q: %v", spec.Name, errClose)
-    }
+	if errClose != nil {
+		return nil, fmt.Errorf("failed to close tasks file for cgroup %q: %v", spec.Name, errClose)
+	}
 
 	// Add the current process to the cgroup tasks file
 	pid := os.Getpid()
@@ -85,9 +85,9 @@ func (cg *Cgroup) Set(control string, value string) error {
 		return fmt.Errorf("failed to open control file %s: %v", controlFile, err)
 	}
 	errClose := f.Close()
-    if errClose != nil {
-        return fmt.Errorf("failed to close tasks file for cgroup %q: %v", controlFile, errClose)
-    }
+	if errClose != nil {
+		return fmt.Errorf("failed to close tasks file for cgroup %q: %v", controlFile, errClose)
+	}
 
 	if _, err := f.WriteString(value); err != nil {
 		return fmt.Errorf("failed to write value to control file %s: %v", controlFile, err)

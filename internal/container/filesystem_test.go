@@ -4,7 +4,6 @@ package container
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,7 +13,7 @@ import (
 
 func TestNewFilesystem(t *testing.T) {
 	// Create a temporary directory to use as the root directory
-	rootDir, err := ioutil.TempDir("", "test_fs")
+	rootDir, err := os.MkdirTemp("", "test_fs")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
@@ -49,7 +48,7 @@ func TestNewFilesystem(t *testing.T) {
 
 func TestMountUnmount(t *testing.T) {
 	// Set up temporary directory for root
-	root, err := ioutil.TempDir("", "test-root")
+	root, err := os.MkdirTemp("", "test-root")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +63,7 @@ func TestMountUnmount(t *testing.T) {
 	fmt.Println("new fs:", fs)
 
 	// Set up temporary directory for mount
-	mount, err := ioutil.TempDir("", "test-mount")
+	mount, err := os.MkdirTemp("", "test-mount")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +123,7 @@ func isMounted(mountpoint string) bool {
 
 func TestCreateRemoveDir(t *testing.T) {
 	// Set up temporary directory for filesystem
-	root, err := ioutil.TempDir("", "test-filesystem")
+	root, err := os.MkdirTemp("", "test-filesystem")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,7 +226,7 @@ func TestCopyFile(t *testing.T) {
 
 func TestSetFileOwnership(t *testing.T) {
 	// Create a temporary directory to use for the filesystem root
-	rootDir, err := ioutil.TempDir("", "fs-test")
+	rootDir, err := os.MkdirTemp("", "fs-test")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
@@ -269,7 +268,7 @@ func TestSetFileOwnership(t *testing.T) {
 
 func TestSetFilePermissions(t *testing.T) {
 	// Create a temporary directory to use for the filesystem root
-	rootDir, err := ioutil.TempDir("", "fs-test")
+	rootDir, err := os.MkdirTemp("", "fs-test")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}

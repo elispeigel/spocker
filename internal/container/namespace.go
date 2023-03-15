@@ -4,7 +4,6 @@ package container
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"syscall"
 )
 
@@ -17,7 +16,10 @@ func NewNamespace(spec *NamespaceSpec) (*Namespace, error) {
 	}
 
 	// Create the child process
-	cmd := exec.Command("/proc/self/exe", "child")
+	cmd, err := runCommand("/proc/self/exe", "child")
+	if err!= nil {
+        return nil, fmt.Errorf("failed to create child process: %v", err)
+    }
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Cloneflags:   syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS,
 		Unshareflags: syscall.CLONE_NEWNS,
@@ -59,7 +61,12 @@ func (ns *Namespace) Enter() error {
 	}
 
 	// Run the "sh" command as a new process with the "bash" shell
-	if err := exec.Command("/bin/sh", "-i").Run(); err != nil {
+	cmd, err := runCommand("/bin/sh", "-i")
+	if err!= nil {
+        return fmt.Errorf("failed to run command: %v", err)
+    }
+	
+	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to start shell: %v", err)
 	}
 
@@ -97,7 +104,10 @@ type NamespaceSpec struct {
 
 // MustSetHostname sets the hostname of the current namespace.
 func MustSetHostname(hostname string) {
-	cmd := exec.Command("sudo", "hostnamectl", "set-hostname", hostname)
+	cmd, err := runCommand("sudo", "hostnamectl", "set-hostname", hostname)
+	if err!= nil {
+        panic(err)
+    }
 	if err := cmd.Run(); err != nil {
 		panic(fmt.Sprintf("failed to set hostname to %s: %v", hostname, err))
 	}

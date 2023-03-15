@@ -14,7 +14,10 @@ type Process struct {
 
 // NewProcess creates a new container process.
 func NewProcess(spec *ProcessSpec) (*Process, error) {
-	cmd := exec.Command(spec.Path, spec.Args...)
+	cmd, err := runCommand(spec.Path, spec.Args...)
+	if err!= nil {
+        return nil, err
+    }
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Cloneflags:   syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS,
 		Unshareflags: syscall.CLONE_NEWNS,

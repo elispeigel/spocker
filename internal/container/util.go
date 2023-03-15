@@ -118,7 +118,13 @@ func GetInitProcess() (*os.Process, error) {
 // ExecContainer runs the container process inside its namespaces.
 func ExecContainer(containerID string, command []string) error {
 	// Set up namespaces
-	cmd := exec.Command(command[0], command[1:]...)
+	
+
+	cmd, err := runCommand(command[0], command[1:]...);
+	if err != nil {
+        return err
+    }
+
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS | syscall.CLONE_NEWNET,
 	}
@@ -149,4 +155,26 @@ func ExecContainer(containerID string, command []string) error {
 	}
 
 	return nil
+}
+
+func runCommand(name string, arg ...string) (*exec.Cmd, error) {
+	whitelist := map[string]bool{
+		"ls":    true,
+		"echo":  true,
+		"mkdir": true,
+		"/bin/sh": true,
+		"/proc/self/exe": true,
+	}
+
+
+	if !whitelist[name] {
+		return nil, fmt.Errorf("invalid command")
+	}
+
+	cmd := exec.Command(name, arg...)
+	if err := cmd.Run(); err != nil {
+		return nil, err
+	}
+
+	return cmd, nil
 }

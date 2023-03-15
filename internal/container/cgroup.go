@@ -24,6 +24,7 @@ func NewCgroup(spec *CgroupSpec) (*Cgroup, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tasks file for cgroup %q: %v", spec.Name, err)
 	}
+	defer tasksFile.Close()
 
 	// Add the current process to the cgroup tasks file
 	pid := os.Getpid()
@@ -37,9 +38,12 @@ func NewCgroup(spec *CgroupSpec) (*Cgroup, error) {
 		subsystemPath := filepath.Join(cgroupRoot, subsystem, spec.Name)
 		subsystemFile, err := os.OpenFile(filepath.Join(subsystemPath, subsystem+".max"), os.O_WRONLY, 0644)
 		if err != nil {
+			// Check if the error is due to the subsystem file not existing
+			if os.IsNotExist(err) {
+				continue // Skip this subsystem and move on to the next one
+			}
 			return nil, fmt.Errorf("failed to open %s file for cgroup %q: %v", subsystem, spec.Name, err)
 		}
-		defer subsystemFile.Close()
 
 		if subsystem == "memory" {
 			// Set the memory limit for the cgroup
@@ -71,7 +75,8 @@ type Cgroup struct {
 
 // Set sets the value of the specified control.
 func (cg *Cgroup) Set(control string, value string) error {
-	controlFile := filepath.Join("/sys/fs/cgroup", cg.Name, control)
+	const cgroupPath = "/sys/fs/cgroup"
+	controlFile := filepath.Join(cgroupPath, cg.Name, control)
 	f, err := os.OpenFile(controlFile, os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open control file %s: %v", controlFile, err)

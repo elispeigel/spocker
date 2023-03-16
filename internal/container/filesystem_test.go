@@ -3,110 +3,118 @@ package container
 
 import (
 	"bufio"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
+	
 )
 
 func TestNewFilesystem(t *testing.T) {
-	// Create a temporary directory to use as the root directory
-	rootDir, err := os.MkdirTemp("", "test_fs")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(rootDir)
+	t.Run("valid root directory", func(t *testing.T) {
+		// Create a temporary directory to use as the root directory
+		rootDir, err := os.MkdirTemp("", "test_fs")
+		if err != nil {
+			t.Fatalf("failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(rootDir)
 
-	// Test that a valid root directory creates a new filesystem object
-	fs, err := NewFilesystem(rootDir)
-	if err != nil {
-		t.Fatalf("failed to create filesystem object: %v", err)
-	}
+		// Test that a valid root directory creates a new filesystem object
+		fs, err := NewFilesystem(rootDir)
+		if err != nil {
+			t.Fatalf("failed to create filesystem object: %v", err)
+		}
 
-	// Test that the created filesystem object has the correct Root field
-	if fs.Root != rootDir {
-		t.Errorf("filesystem root is incorrect: expected %s, got %s", rootDir, fs.Root)
-	}
+		// Test that the created filesystem object has the correct Root field
+		if fs.Root != rootDir {
+			t.Errorf("filesystem root is incorrect: expected %s, got %s", rootDir, fs.Root)
+		}
+	})
 
-	// Test that an invalid root directory returns an error
-	invalidDir := filepath.Join(rootDir, "invalid")
-	err = os.Mkdir(invalidDir, 0755)
-	if err != nil {
-		t.Fatalf("failed to create invalid root dir: %v", err)
-	}
-	err = os.Remove(invalidDir)
-	if err != nil {
-		t.Fatalf("failed to remove invalid root dir: %v", err)
-	}
-	_, err = NewFilesystem(invalidDir)
-	if err == nil {
-		t.Errorf("expected error for invalid root directory, but got nil")
-	}
+	t.Run("invalid root directory", func(t *testing.T) {
+		// Create a temporary directory to use as the root directory
+		rootDir, err := os.MkdirTemp("", "test_fs")
+		if err != nil {
+			t.Fatalf("failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(rootDir)
+
+		// Test that an invalid root directory returns an error
+		invalidDir := filepath.Join(rootDir, "invalid")
+		err = os.Mkdir(invalidDir, 0755)
+		if err != nil {
+			t.Fatalf("failed to create invalid root dir: %v", err)
+		}
+		err = os.Remove(invalidDir)
+		if err != nil {
+			t.Fatalf("failed to remove invalid root dir: %v", err)
+		}
+		_, err = NewFilesystem(invalidDir)
+		if err == nil {
+			t.Errorf("expected error for invalid root directory, but got nil")
+		}
+	})
 }
 
 func TestMountUnmount(t *testing.T) {
-	// Set up temporary directory for root
-	root, err := os.MkdirTemp("", "test-root")
-	if err != nil {
-		t.Fatal(err)
-	}
-	// defer os.RemoveAll(root)
-	fmt.Println("root:", root)
+	t.Run("mount and unmount", func(t *testing.T) {
+		// Set up temporary directory for root
+		root, err := os.MkdirTemp("", "test-root")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer os.RemoveAll(root)
 
-	// Create a new Filesystem object
-	fs, err := NewFilesystem(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fmt.Println("new fs:", fs)
+		// Create a new Filesystem object
+		fs, err := NewFilesystem(root)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	// Set up temporary directory for mount
-	mount, err := os.MkdirTemp("", "test-mount")
-	if err != nil {
-		t.Fatal(err)
-	}
-	// defer os.RemoveAll(mount)
-	fmt.Println("mount dir:", mount)
+		// Set up temporary directory for mount
+		mount, err := os.MkdirTemp("", "test-mount")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer os.RemoveAll(mount)
 
-	// Create a new Mount object
-	m := &Mount{
-		Source: "tmpfs",
-		Target: mount,
-		FSType: "tmpfs",
-		Flags:  syscall.MS_NOSUID,
-	}
+		// Create a new Mount object
+		m := &Mount{
+			Source: "tmpfs",
+			Target: mount,
+			FSType: "tmpfs",
+			Flags:  syscall.MS_NOSUID,
+		}
 
-	// Mount the filesystem
-	if err := fs.Mount(m); err != nil {
-		t.Fatalf("failed to mount filesystem: %v", err)
-	}
+		// Mount the filesystem
+		if err := fs.Mount(m); err != nil {
+			t.Fatalf("failed to mount filesystem: %v", err)
+		}
 
-	// Check if the mountpoint is actually mounted
-	if !isMounted(mount) {
-		t.Errorf("mountpoint %s is not mounted", mount)
-	}
+		// Check if the mountpoint is actually mounted
+		if !isMounted(mount) {
+			t.Errorf("mountpoint %s is not mounted", mount)
+		}
 
-	// Unmount the filesystem
-	if err := fs.Unmount(mount); err != nil {
-		t.Fatalf("failed to unmount filesystem: %v", err)
-	}
-
-	// Check if the mountpoint is actually unmounted
-	if isMounted(mount) {
-		t.Errorf("mountpoint %s is still mounted", mount)
-	}
+		// Unmount the filesystem
+		if err := fs.Unmount(mount); err != nil {
+			t.Fatalf("failed to unmount filesystem: %v", err)
+		}
+		// Check if the mountpoint is actually unmounted
+		if isMounted(mount) {
+			t.Errorf("mountpoint %s is still mounted", mount)
+		}
+	})
 }
 
 // isMounted checks if the given mountpoint is currently mounted.
-func isMounted(mountpoint string) bool {
+func isMounted(mountpoint string, ) bool {
 	f, err := os.Open("/proc/mounts")
 	if err != nil {
 		return false
 	}
 	defer f.Close()
-
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		fields := strings.Fields(scanner.Text())
@@ -122,32 +130,33 @@ func isMounted(mountpoint string) bool {
 }
 
 func TestCreateRemoveDir(t *testing.T) {
-	// Set up temporary directory for filesystem
-	root, err := os.MkdirTemp("", "test-filesystem")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(root)
+	t.Run("create and remove directory", func(t *testing.T) {
+		// Set up temporary directory for filesystem
+		root, err := os.MkdirTemp("", "test-filesystem")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer os.RemoveAll(root)
+		// Create new Filesystem object with temporary directory as root
+		fs := &Filesystem{Root: root}
 
-	// Create new Filesystem object with temporary directory as root
-	fs := &Filesystem{Root: root}
+		// Create a directory and verify that it was created
+		dirPath := "test-dir"
+		if err := fs.CreateDir(dirPath); err != nil {
+			t.Fatalf("failed to create directory: %v", err)
+		}
+		if _, err := os.Stat(filepath.Join(fs.Root, dirPath)); err != nil {
+			t.Fatalf("directory not found: %v", err)
+		}
 
-	// Create a directory and verify that it was created
-	dirPath := "test-dir"
-	if err := fs.CreateDir(dirPath); err != nil {
-		t.Fatalf("failed to create directory: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(fs.Root, dirPath)); err != nil {
-		t.Fatalf("directory not found: %v", err)
-	}
-
-	// Remove the directory and verify that it was removed
-	if err := fs.RemoveDir(dirPath); err != nil {
-		t.Fatalf("failed to remove directory: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(fs.Root, dirPath)); !os.IsNotExist(err) {
-		t.Fatalf("directory still exists after removal")
-	}
+		// Remove the directory and verify that it was removed
+		if err := fs.RemoveDir(dirPath); err != nil {
+			t.Fatalf("failed to remove directory: %v", err)
+		}
+		if _, err := os.Stat(filepath.Join(fs.Root, dirPath)); !os.IsNotExist(err) {
+			t.Fatalf("directory still exists after removal")
+		}
+	})
 }
 
 func TestCreateRemoveFile(t *testing.T) {

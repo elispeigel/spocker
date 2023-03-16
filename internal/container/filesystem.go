@@ -104,9 +104,20 @@ func (fs *Filesystem) CopyFile(src string, dst string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open source file %s: %v", src, err)
 	}
-	errSrcClose := srcFile.Close()
-	if errSrcClose != nil {
-		return fmt.Errorf("failed to close source file %q: %v", src, errSrcClose)
+	defer func() {
+		errSrcClose := srcFile.Close()
+		if errSrcClose != nil {
+			fmt.Printf("failed to close source file %q: %v", src, errSrcClose)
+		}
+	}()
+
+	// Check if src is a directory
+	srcInfo, err := srcFile.Stat()
+	if err != nil {
+		return fmt.Errorf("failed to stat source file %s: %v", src, err)
+	}
+	if srcInfo.IsDir() {
+		return fmt.Errorf("source is a directory %s", src)
 	}
 
 	// Create the destination file for writing
@@ -114,10 +125,20 @@ func (fs *Filesystem) CopyFile(src string, dst string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create destination file %s: %v", dst, err)
 	}
+	defer func() {
+		errDstClose := dstFile.Close()
+		if errDstClose != nil {
+			fmt.Printf("failed to close destination file %q: %v", dst, errDstClose)
+		}
+	}()
 
-	errDstClose := dstFile.Close()
-	if errDstClose != nil {
-		return fmt.Errorf("failed to close destination file %q: %v", dst, errDstClose)
+	// Check if dst is a directory
+	dstInfo, err := dstFile.Stat()
+	if err != nil {
+		return fmt.Errorf("failed to stat destination file %s: %v", dst, err)
+	}
+	if dstInfo.IsDir() {
+		return fmt.Errorf("destination is a directory %s", dst)
 	}
 
 	// Copy the contents of the source file to the destination file

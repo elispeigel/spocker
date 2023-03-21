@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"math/big"
+	"math/rand"
 	"net"
 	"os"
 	"strings"
@@ -95,25 +96,29 @@ func handler(conn net.PacketConn, peer net.Addr, m dhcpv6.DHCPv6) {
 
 // GetAvailableIP finds and returns an available IP address in the given IPNet subnet range.
 func GetAvailableIP(ipNet *net.IPNet) (net.IP, error) {
-	ipRange := ipNet.IP.Mask(ipNet.Mask)
+    ipRange := ipNet.IP.Mask(ipNet.Mask)
 
-	start := big.NewInt(0).SetBytes(ipRange.To4())
-	// Increment start by 1 to skip the network address
-	start.Add(start, big.NewInt(1))
+    ones, bits := ipNet.Mask.Size()
+    ipSpace := int(math.Pow(2, float64(bits-ones)))
 
-	ones, bits := ipNet.Mask.Size()
-	ipSpace := int(math.Pow(2, float64(bits-ones)))
+    // Create a new random number generator with a specific seed
+    randSrc := rand.NewSource(time.Now().UnixNano())
+    randGen := rand.New(randSrc)
 
-	end := big.NewInt(0).Add(start, big.NewInt(int64(ipSpace-1)))
+    // Try up to 10 random addresses
+    for i := 0; i < 10; i++ {
+        // Generate a random IP address within the subnet range
+        randInt := randGen.Intn(ipSpace)
+        ipInt := big.NewInt(0).Add(big.NewInt(int64(randInt)), big.NewInt(0).SetBytes(ipRange.To4()))
+        ip := net.IP(ipInt.Bytes())
 
-	for ip := start; ip.Cmp(end) <= 0; ip.Add(ip, big.NewInt(1)) {
-		ipAddr := net.IP(ip.Bytes())
-		if !IsIPInUse(ipAddr) {
-			return ipAddr, nil
-		}
-	}
+        // Check if the IP address is available
+        if !IsIPInUse(ip) {
+            return ip, nil
+        }
+    }
 
-	return nil, fmt.Errorf("no available IP address in subnet range")
+    return nil, fmt.Errorf("no available IP address in subnet range")
 }
 
 

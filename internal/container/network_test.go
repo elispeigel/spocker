@@ -336,3 +336,86 @@ func TestDisconnectFromNetwork(t *testing.T) {
 		t.Fatalf("DNS %s is still reachable after disconnection", network.DNS[0].String())
 	}
 }
+
+func TestConnectToNetwork_NonExistentNetwork(t *testing.T) {
+	containerID := "test_container"
+	ipNet := &net.IPNet{
+		IP:   net.IPv4(192, 168, 0, 2),
+		Mask: net.CIDRMask(24, 32),
+	}
+	network := &Network{
+		Name:    "non_existent_network",
+		IPNet:   ipNet,
+		Gateway: net.ParseIP("192.168.0.1"),
+		DNS:     []net.IP{net.ParseIP("8.8.8.8")},
+	}
+
+	err := ConnectToNetwork(containerID, network)
+	if err == nil {
+		t.Fatalf("Expected error when connecting container to a non-existent network, but got no error")
+	}
+}
+
+func TestConnectToNetwork_InvalidIPAddress(t *testing.T) {
+    networkName := "test_network"
+    err := createTestNetwork(networkName)
+    if err != nil {
+        t.Fatalf("Failed to create test network: %v", err)
+    }
+
+    containerID := "test_container"
+    ipNet := &net.IPNet{
+        IP:   net.ParseIP("256.168.0.2"), // Invalid IP address
+        Mask: net.CIDRMask(24, 32),
+    }
+    network := &Network{
+        Name:    networkName,
+        IPNet:   ipNet,
+        Gateway: net.ParseIP("192.168.0.1"),
+        DNS:     []net.IP{net.ParseIP("8.8.8.8")},
+    }
+
+    err = ConnectToNetwork(containerID, network)
+    if err == nil {
+        t.Fatalf("Expected error when connecting container with an invalid IP address, but got no error")
+    }
+}
+
+
+func TestConnectToNetwork_DuplicateIPAddress(t *testing.T) {
+	networkName := "test_network"
+	err := createTestNetwork(networkName)
+	if err != nil {
+		t.Fatalf("Failed to create test network: %v", err)
+	}
+
+	containerID := "test_container"
+	ipNet := &net.IPNet{
+		IP:   net.IPv4(192, 168, 0, 2),
+		Mask: net.CIDRMask(24, 32),
+	}
+	network := &Network{
+		Name:    networkName,
+		IPNet:   ipNet,
+		Gateway: net.ParseIP("192.168.0.1"),
+		DNS:     []net.IP{net.ParseIP("8.8.8.8")},
+	}
+
+	// First connection attempt
+	err = ConnectToNetwork(containerID, network)
+	if err != nil {
+		t.Fatalf("Failed to connect container %s to network %s: %v", containerID, networkName, err)
+	}
+
+	// Second connection attempt with the same IP address
+	containerID2 := "test_container_2"
+	err = ConnectToNetwork(containerID2, network)
+	if err == nil {
+		t.Fatalf("Expected error when connecting two containers with the same IP address, but got no error")
+	}
+
+	err = DisconnectFromNetwork(containerID, network.Name)
+	if err != nil {
+		t.Fatalf("Failed to disconnect container %s from network %s: %v", containerID, networkName, err)
+	}
+}

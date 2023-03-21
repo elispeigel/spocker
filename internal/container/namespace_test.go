@@ -1,4 +1,3 @@
-// Package container provides functions for creating a container.
 package container
 
 import (
@@ -7,6 +6,24 @@ import (
 	"testing"
 )
 
+func assertNoError(t *testing.T, err error) {
+	t.Helper()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestNewNamespace(t *testing.T) {
+	spec := &NamespaceSpec{
+		Name: "test-namespace",
+		Type: NamespaceTypePID,
+	}
+
+	ns, err := NewNamespace(spec)
+	assertNoError(t, err)
+	defer ns.Close()
+}
+
 func TestNamespaceEnterAndClose(t *testing.T) {
 	spec := &NamespaceSpec{
 		Name: "test-namespace",
@@ -14,29 +31,23 @@ func TestNamespaceEnterAndClose(t *testing.T) {
 	}
 
 	ns, err := NewNamespace(spec)
-	if err != nil {
-		t.Fatalf("failed to create namespace: %v", err)
-	}
+	assertNoError(t, err)
 	defer ns.Close()
 
 	err = ns.Enter()
-	if err != nil {
-		t.Fatalf("failed to enter namespace: %v", err)
-	}
+	assertNoError(t, err)
 }
 
-func TestMustSetHostname(t *testing.T) {
+func TestSetHostname(t *testing.T) {
 	err := syscall.Sethostname([]byte("test-hostname"))
-	if err != nil {
-		t.Fatalf("failed to set hostname: %v", err)
-	}
+	assertNoError(t, err)
 
-	MustSetHostname("test-hostname2")
+	err = SetHostname("test-hostname2")
+	assertNoError(t, err)
 
 	hostname, err := os.Hostname()
-	if err != nil {
-		t.Fatalf("failed to get hostname: %v", err)
-	}
+	assertNoError(t, err)
+
 	if hostname != "test-hostname2" {
 		t.Fatalf("expected hostname to be %q, but got %q", "test-hostname2", hostname)
 	}

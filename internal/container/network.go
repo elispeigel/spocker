@@ -42,7 +42,7 @@ func CreateNetwork(config *NetworkConfig) (*Network, error) {
 	}
 
 	if _, err := net.InterfaceByName(config.Name); err == nil {
-		return nil, fmt.Errorf("network already exists")
+		return nil, fmt.Errorf("network already exists: %w", err)
 	}
 
 	if config.DHCP {

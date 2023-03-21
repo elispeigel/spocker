@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"fmt"
 	"log"
+	"math"
 	"math/big"
 	"net"
 	"os"
@@ -96,9 +97,14 @@ func handler(conn net.PacketConn, peer net.Addr, m dhcpv6.DHCPv6) {
 func GetAvailableIP(ipNet *net.IPNet) (net.IP, error) {
 	ipRange := ipNet.IP.Mask(ipNet.Mask)
 
-	start := big.NewInt(0).SetBytes(ipRange)
-	mask := big.NewInt(0).SetBytes(ipNet.Mask)
-	end := big.NewInt(0).Add(start, big.NewInt(0).Not(mask))
+	start := big.NewInt(0).SetBytes(ipRange.To4())
+	// Increment start by 1 to skip the network address
+	start.Add(start, big.NewInt(1))
+
+	ones, bits := ipNet.Mask.Size()
+	ipSpace := int(math.Pow(2, float64(bits-ones)))
+
+	end := big.NewInt(0).Add(start, big.NewInt(int64(ipSpace-1)))
 
 	for ip := start; ip.Cmp(end) <= 0; ip.Add(ip, big.NewInt(1)) {
 		ipAddr := net.IP(ip.Bytes())
@@ -109,6 +115,7 @@ func GetAvailableIP(ipNet *net.IPNet) (net.IP, error) {
 
 	return nil, fmt.Errorf("no available IP address in subnet range")
 }
+
 
 // IsIPInUse checks if the given IP address is already in use.
 func IsIPInUse(ip net.IP) bool {

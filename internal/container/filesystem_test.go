@@ -8,7 +8,6 @@ import (
 	"strings"
 	"syscall"
 	"testing"
-	
 )
 
 func TestNewFilesystem(t *testing.T) {
@@ -109,7 +108,7 @@ func TestMountUnmount(t *testing.T) {
 }
 
 // isMounted checks if the given mountpoint is currently mounted.
-func isMounted(mountpoint string, ) bool {
+func isMounted(mountpoint string) bool {
 	f, err := os.Open("/proc/mounts")
 	if err != nil {
 		return false

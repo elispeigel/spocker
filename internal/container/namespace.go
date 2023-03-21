@@ -10,40 +10,39 @@ import (
 
 // NewNamespace returns a new namespace object.
 func NewNamespace(spec *NamespaceSpec) (*Namespace, error) {
-    r, w, err := os.Pipe()
-    if err != nil {
-        return nil, fmt.Errorf("failed to create pipe: %w", err)
-    }
-	
+	r, w, err := os.Pipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pipe: %w", err)
+	}
+
 	ctx := context.Background()
-    cmd, err := createCommand(ctx, "/proc/self/exe", "child")
-    if err != nil {
-        return nil, fmt.Errorf("failed to create child process: %w", err)
-    }
-    cmd.SysProcAttr = &syscall.SysProcAttr{
-        Cloneflags:   syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS,
-        Unshareflags: syscall.CLONE_NEWNS,
-    }
-    cmd.ExtraFiles = []*os.File{w}
-    cmd.Stderr = os.Stderr
+	cmd, err := createCommand(ctx, "/proc/self/exe", "child")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create child process: %w", err)
+	}
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Cloneflags:   syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS,
+		Unshareflags: syscall.CLONE_NEWNS,
+	}
+	cmd.ExtraFiles = []*os.File{w}
+	cmd.Stderr = os.Stderr
 
-    if err := cmd.Start(); err != nil {
-        return nil, fmt.Errorf("failed to start container process: %w", err)
-    }
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("failed to start container process: %w", err)
+	}
 
-    file := os.NewFile(uintptr(r.Fd()), "namespace")
+	file := os.NewFile(uintptr(r.Fd()), "namespace")
 
-    ns := &Namespace{
-        Name: spec.Name,
-        Type: spec.Type,
-        File: file,
-    }
+	ns := &Namespace{
+		Name: spec.Name,
+		Type: spec.Type,
+		File: file,
+	}
 
-    defer file.Close()
+	defer file.Close()
 
-    return ns, nil
+	return ns, nil
 }
-
 
 // Namespace is an abstraction over a Linux namespace.
 type Namespace struct {
@@ -100,7 +99,7 @@ type NamespaceSpec struct {
 
 // SetHostname sets the hostname of the current namespace and returns an error if it fails.
 func SetHostname(hostname string) error {
-	
+
 	ctx := context.Background()
 	cmd, err := createCommand(ctx, "sudo", "hostnamectl", "set-hostname", hostname)
 	if err != nil {

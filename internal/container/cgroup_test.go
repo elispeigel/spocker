@@ -10,6 +10,18 @@ import (
 func TestCgroup(t *testing.T) {
 	spec := &CgroupSpec{
 		Name: "testcgroup",
+		Resources: &Resources{
+			Memory: &Memory{
+                    Limit: 1024,
+                },
+			CPU: &CPU{
+				Shares: 1,
+			},
+			BlkIO: &BlkIO{
+				Weight: 1,
+			},
+		},
+		CgroupRoot: "/test",
 	}
 
 	// Create a new cgroup

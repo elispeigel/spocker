@@ -8,10 +8,11 @@ import (
 )
 
 // Run sets up the container environment and runs the specified command.
-// Run sets up the container environment and runs the specified command.
 func Run(cmd *exec.Cmd, cgroupSpec *CgroupSpec, namespaceSpec *NamespaceSpec, fsRoot string, networkConfig *NetworkConfig) error {
 	// Set up cgroups, namespaces, or any other container settings here
-	cgroup, err := NewCgroup(cgroupSpec)
+	subsystems := []Subsystem{&CPUSubsystem{}, &MemorySubsystem{}, &BlkIOSubsystem{}}
+	factory := NewDefaultCgroupFactory(subsystems)
+	cgroup, err := factory.CreateCgroup(cgroupSpec)
 	if err != nil {
 		return fmt.Errorf("failed to create cgroup: %v", err)
 	}

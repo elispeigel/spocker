@@ -1,4 +1,3 @@
-// Package container provides functions for creating a container, limiting its resources using Linux control groups (cgroups).
 package container
 
 import (
@@ -13,10 +12,69 @@ import (
 	"syscall"
 )
 
+type CgroupFactory interface {
+	CreateCgroup(spec *CgroupSpec) (*Cgroup, error)
+}
+
+type DefaultCgroupFactory struct {
+	subsystems []Subsystem
+}
+
+func NewDefaultCgroupFactory(subsystems []Subsystem) *DefaultCgroupFactory {
+	return &DefaultCgroupFactory{subsystems: subsystems}
+}
+
+func (f *DefaultCgroupFactory) CreateCgroup(spec *CgroupSpec) (*Cgroup, error) {
+	cgroup, err := NewCgroup(spec, f.subsystems)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cgroup: %v", err)
+	}
+	return cgroup, nil
+}
+
+
+// Subsystem represents a cgroup subsystem.
+type Subsystem interface {
+	Name() string
+	ApplySettings(cgroupPath string, resources *Resources) error
+}
+
+// CPUSubsystem is an implementation of the Subsystem interface for the "cpu" subsystem.
+type CPUSubsystem struct{}
+
+func (c *CPUSubsystem) Name() string {
+	return "cpu"
+}
+
+func (c *CPUSubsystem) ApplySettings(cgroupPath string, resources *Resources) error {
+	return setSubsystemValue(cgroupPath, "cpu.shares", resources.CPU.Shares)
+}
+
+// MemorySubsystem is an implementation of the Subsystem interface for the "memory" subsystem.
+type MemorySubsystem struct{}
+
+func (m *MemorySubsystem) Name() string {
+	return "memory"
+}
+
+func (m *MemorySubsystem) ApplySettings(cgroupPath string, resources *Resources) error {
+	return setSubsystemValue(cgroupPath, "memory.limit_in_bytes", resources.Memory.Limit)
+}
+
+// BlkIOSubsystem is an implementation of the Subsystem interface for the "blkio" subsystem.
+type BlkIOSubsystem struct{}
+
+func (b *BlkIOSubsystem) Name() string {
+	return "blkio"
+}
+
+func (b *BlkIOSubsystem) ApplySettings(cgroupPath string, resources *Resources) error {
+	return setSubsystemValue(cgroupPath, "blkio.weight", resources.BlkIO.Weight)
+}
+
 // NewCgroup returns a new cgroup object based on the given specification.
 // The cgroup will be created with the specified name, and resources will be limited according to the given resource allocation.
-func NewCgroup(spec *CgroupSpec) (*Cgroup, error) {
-	subsystems := []string{"cpu", "memory", "blkio"} // Add "blkio" to the list of subsystems
+func NewCgroup(spec *CgroupSpec, subsystems []Subsystem) (*Cgroup, error) {
 	cgroupRoot := spec.CgroupRoot
 	if cgroupRoot == "" {
 		cgroupRoot = "/sys/fs/cgroup"
@@ -39,20 +97,15 @@ func NewCgroup(spec *CgroupSpec) (*Cgroup, error) {
 	}
 
 	for _, subsystem := range subsystems {
-		subsystemPath := filepath.Join(cgroupRoot, subsystem, spec.Name)
+		subsystemPath := filepath.Join(cgroupRoot, subsystem.Name(), spec.Name)
 
-		if subsystem == "cpu" {
-			if err := setSubsystemValue(subsystemPath, "cpu.shares", spec.Resources.CPU.Shares); err != nil {
-				return nil, err
-			}
-		} else if subsystem == "memory" {
-			if err := setSubsystemValue(subsystemPath, "memory.limit_in_bytes", spec.Resources.Memory.Limit); err != nil {
-				return nil, err
-			}
-		} else if subsystem == "blkio" {
-			if err := setSubsystemValue(subsystemPath, "blkio.weight", spec.Resources.BlkIO.Weight); err != nil {
-				return nil, err
-			}
+		// Create subsystem directory if it doesn't exist
+		if err := os.MkdirAll(subsystemPath, 0755); err != nil {
+			return nil, fmt.Errorf("failed to create subsystem directory %q: %v", subsystemPath, err)
+		}
+
+		if err := subsystem.ApplySettings(subsystemPath, spec.Resources); err != nil {
+			return nil, err
 		}
 	}
 
@@ -118,6 +171,41 @@ func (cg *Cgroup) Remove() error {
 	return nil
 }
 
+// CgroupSpecBuilder is a builder for CgroupSpec objects.
+type CgroupSpecBuilder struct {
+	spec *CgroupSpec
+}
+
+// NewCgroupSpecBuilder creates a new CgroupSpecBuilder.
+func NewCgroupSpecBuilder() *CgroupSpecBuilder {
+	return &CgroupSpecBuilder{
+		spec: &CgroupSpec{},
+	}
+}
+
+// WithName sets the name of the cgroup spec.
+func (b *CgroupSpecBuilder) WithName(name string) *CgroupSpecBuilder {
+	b.spec.Name = name
+	return b
+}
+
+// WithResources sets the resources of the cgroup spec.
+func (b *CgroupSpecBuilder) WithResources(resources *Resources) *CgroupSpecBuilder {
+	b.spec.Resources = resources
+	return b
+}
+
+// WithCgroupRoot sets the cgroup root of the cgroup spec.
+func (b *CgroupSpecBuilder) WithCgroupRoot(cgroupRoot string) *CgroupSpecBuilder {
+	b.spec.CgroupRoot = cgroupRoot
+	return b
+}
+
+// Build constructs the CgroupSpec object using the provided settings.
+func (b *CgroupSpecBuilder) Build() *CgroupSpec {
+	return b.spec
+}
+
 // CgroupSpec represents the specification for a Linux control group.
 // It contains the name of the cgroup, resources to be allocated, and the root path to the cgroup.
 type CgroupSpec struct {
@@ -156,8 +244,13 @@ type Memory struct {
 // This function takes a maximum memory value (in bytes) as an argument and limits the memory usage of the current process accordingly.
 func MustLimitMemory(maxMemory int64) {
 	const memoryLimitControl = "memory.limit_in_bytes"
-	cgroupSpec := &CgroupSpec{Name: "container"}
-	cgroup, err := NewCgroup(cgroupSpec)
+	cgroupSpec := NewCgroupSpecBuilder().
+		WithName("container").
+		Build()
+	subsystems := []Subsystem{&CPUSubsystem{}, &MemorySubsystem{}, &BlkIOSubsystem{}}
+	factory := NewDefaultCgroupFactory(subsystems)
+	cgroup, err := factory.CreateCgroup(cgroupSpec)
+
 	if err != nil {
 		log.Fatalf("failed to create cgroup: %v", err)
 	}
@@ -251,15 +344,18 @@ func ExecContainer(containerID string, command []string) error {
 	}
 
 	// Set up cgroup
-	cgroupConfig := &CgroupSpec{
-		Name: containerID,
-		Resources: &Resources{
+	cgroupConfig := NewCgroupSpecBuilder().
+		WithName(containerID).
+		WithResources(&Resources{
 			Memory: &Memory{
 				Limit: 1024 * 1024 * 1024, // 1 GB
 			},
-		},
-	}
-	cgroup, err := NewCgroup(cgroupConfig)
+		}).
+		Build()
+	subsystems := []Subsystem{&CPUSubsystem{}, &MemorySubsystem{}, &BlkIOSubsystem{}}
+	factory := NewDefaultCgroupFactory(subsystems)
+	cgroup, err := factory.CreateCgroup(cgroupConfig)
+
 	if err != nil {
 		return err
 	}

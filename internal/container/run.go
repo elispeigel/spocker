@@ -1,3 +1,10 @@
+/**
+* Package container provides functionalities for setting up a container environment, including cgroups,
+* namespaces, filesystems, networks, and running commands inside the container. The Run function sets up
+* the container environment and runs the specified command. It uses cgroups to manage system resources,
+* namespaces to isolate the container's processes, filesystems to isolate the container's filesystem, and
+* networks to isolate the container's network stack.
+*/
 package container
 
 import (

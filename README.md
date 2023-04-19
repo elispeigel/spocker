@@ -1,40 +1,80 @@
-Container Package
+# Spocker
 
-The container package provides an abstraction over a Linux control group (cgroup) and allows users to limit the resources of a process. The package contains the following functions and types:
-Functions
-NewCgroup
+Spocker is a lightweight container runtime tool that provides basic containerization features, allowing you to run processes within a sandboxed environment, isolating them from the host system. Spocker supports limiting resources such as memory, CPU shares, and block I/O weight, as well as providing namespace isolation and basic networking features.
 
-NewCgroup returns a new cgroup object based on the provided CgroupSpec. It creates a cgroup directory, tracks the tasks in the cgroup, and sets the memory limit if specified in the CgroupSpec. The function returns an error if any of these steps fail.
-MustLimitMemory
+The tool is controlled through a command-line interface and accepts various flags to customize the container environment, including flags for setting memory limits, CPU shares, block I/O weight, cgroup and namespace names, namespace types, filesystem root, and network configuration.
 
-MustLimitMemory limits the memory usage of the current process. It creates a cgroup object and sets the memory limit control to the specified value. The function logs a fatal error if any of these steps fail.
-Types
-Cgroup
+Spocker requires root privileges to execute and leverages Linux kernel features such as cgroups, namespaces, and network namespaces to provide containerization.
 
-Cgroup is an abstraction over a Linux control group. It contains the name of the cgroup and a file that tracks the tasks in the cgroup.
-CgroupSpec
+## Installation
 
-CgroupSpec represents the specification for a Linux control group. It contains the name of the cgroup and the resources to limit, currently only memory resources are supported.
-Resources
+Spocker requires a Linux environment to run. To install Spocker, follow these steps:
 
-Resources contains the resource limits for a cgroup. Currently, only memory resources are supported.
-Memory
+1. Clone the repository:
 
-Memory contains the memory limit for a cgroup.
-Example Usage
+   ```
+   git clone https://github.com/elispeigel/spocker.git
+   ```
+
+2. Change to the Spocker directory:
+
+   ```
+   cd spocker
+   ```
+
+3. Build the Spocker binary:
+
+   ```
+   go build -o spocker
+   ```
+
+4. Move the Spocker binary to a directory in your `PATH`:
+
+   ```
+   sudo mv spocker /usr/local/bin/
+   ```
+
+## Usage
+
+To use Spocker, run the following command with the appropriate flags:
 
 ```
-
-import (
-    "log"
-    "github.com/example/container"
-)
-
-func main() {
-    // Limit the memory usage of the current process to 128 MB
-    container.MustLimitMemory(128 * 1024 * 1024)
-    
-    // ... Run the main process ...
-}
+spocker run [flags] <command> [args...]
 ```
-This code limits the memory usage of the current process to 128 MB using the MustLimitMemory function provided by the container package. If any of the steps fail, a fatal error is logged.
+
+For example, to run a simple container with a limited amount of memory:
+
+```
+spocker run --memory-limit 100000000 /bin/bash
+```
+
+For more usage examples and flag descriptions, refer to the [documentation](docs/USAGE.md).
+
+## Support
+
+For support or to report any issues, please open an issue on the [issue tracker](https://github.com/elispeigel/spocker/issues).
+
+## Roadmap
+
+- Improve error handling and user feedback
+- Add support for more resource constraints
+- Improve networking support and configuration options
+- Enhance container management and monitoring capabilities
+
+## Contributing
+
+Contributions are welcome! Please refer to the [contributing guide](CONTRIBUTING.md) for more information on how to contribute to the project.
+
+## Authors and Acknowledgment
+
+- Eli Speigel - Initial work and maintainer
+
+Special thanks to all the [contributors](https://github.com/elispeigel/spocker/graphs/contributors) who have helped improve Spocker!
+
+## License
+
+Spocker is licensed under the [MIT License](LICENSE).
+
+## Project Status
+
+Spocker is under active development, and new features and improvements are planned. If you have any suggestions or would like to contribute, please feel free to open an issue or submit a pull request.

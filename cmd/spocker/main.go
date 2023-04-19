@@ -1,3 +1,17 @@
+// Spocker is a lightweight container runtime tool that provides basic
+// containerization features. It allows you to run processes within a sandboxed
+// environment, isolating them from the host system. Spocker supports
+// limiting resources such as memory, CPU shares, and block I/O weight, as well
+// as providing namespace isolation and basic networking features.
+
+// The tool is controlled through a command-line interface and accepts various
+// flags to customize the container environment. These include flags for setting
+// memory limits, CPU shares, block I/O weight, cgroup and namespace names,
+// namespace types, filesystem root, and network configuration.
+
+// Spocker requires root privileges to execute and leverages Linux kernel
+// features such as cgroups, namespaces, and network namespaces to provide
+// containerization.
 package main
 
 import (

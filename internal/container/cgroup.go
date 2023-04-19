@@ -1,3 +1,6 @@
+// Package container provides a set of utilities to manage Linux control groups (cgroups).
+// This package allows the creation and management of cgroups, applying resource limits,
+// and running processes within those cgroups.
 package container
 
 import (
@@ -12,14 +15,17 @@ import (
 	"syscall"
 )
 
+// CgroupFactory is an interface for creating Cgroup objects with different configurations based on the CgroupSpec provided.
 type CgroupFactory interface {
 	CreateCgroup(spec *CgroupSpec) (*Cgroup, error)
 }
 
+// DefaultCgroupFactory is a struct that implements the CgroupFactory interface and creates Cgroups using the specified subsystems.
 type DefaultCgroupFactory struct {
 	subsystems []Subsystem
 }
 
+// NewDefaultCgroupFactory returns a new instance of DefaultCgroupFactory with the specified subsystems.
 func NewDefaultCgroupFactory(subsystems []Subsystem) *DefaultCgroupFactory {
 	return &DefaultCgroupFactory{subsystems: subsystems}
 }
@@ -31,7 +37,6 @@ func (f *DefaultCgroupFactory) CreateCgroup(spec *CgroupSpec) (*Cgroup, error) {
 	}
 	return cgroup, nil
 }
-
 
 // Subsystem represents a cgroup subsystem.
 type Subsystem interface {

@@ -82,6 +82,7 @@ func (ns *Namespace) Close() error {
 // NamespaceType is an enumeration of the different types of Linux namespaces.
 type NamespaceType int
 
+// These constants define the types of namespaces that can be created.
 const (
 	NamespaceTypePID NamespaceType = iota
 	NamespaceTypeUTS

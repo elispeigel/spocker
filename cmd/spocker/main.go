@@ -24,6 +24,9 @@ import (
 	"syscall"
 
 	"github.com/elispeigel/spocker/internal/container"
+	"github.com/elispeigel/spocker/internal/container/cgroup"
+	"github.com/elispeigel/spocker/internal/container/namespace"
+	"github.com/elispeigel/spocker/internal/container/network"
 )
 
 func usage() {
@@ -70,24 +73,24 @@ func main() {
 			os.Exit(1)
 		}
 
-		cgroupSpec := &container.CgroupSpec{
+		cgroupSpec := &cgroup.CgroupSpec{
 			Name: *cgroupNameFlag,
-			Resources: &container.Resources{
-				Memory: &container.Memory{
+			Resources: &cgroup.Resources{
+				Memory: &cgroup.Memory{
 					Limit: memoryLimit,
 				},
-				CPU: &container.CPU{
+				CPU: &cgroup.CPU{
 					Shares: cpuShares,
 				},
-				BlkIO: &container.BlkIO{
+				BlkIO: &cgroup.BlkIO{
 					Weight: blkioWeight,
 				},
 			},
 		}
 
-		namespaceSpec := &container.NamespaceSpec{
+		namespaceSpec := &namespace.NamespaceSpec{
 			Name: *namespaceNameFlag,
-			Type: container.NamespaceType(*namespaceTypeFlag),
+			Type: namespace.NamespaceType(*namespaceTypeFlag),
 		}
 
 		_, ipNet, err := net.ParseCIDR(*networkIPCIDRFlag)
@@ -96,7 +99,7 @@ func main() {
 			return
 		}
 
-		networkConfig := &container.NetworkConfig{
+		networkConfig := &network.NetworkConfig{
 			Name:  *networkNameFlag,
 			IPNet: ipNet,
 			Gateway: net.ParseIP(*networkGatewayFlag),
@@ -109,7 +112,7 @@ func main() {
 	}
 }
 
-func run(cgroupSpec *container.CgroupSpec, namespaceSpec *container.NamespaceSpec, fsRoot string, networkConfig *container.NetworkConfig) {
+func run(cgroupSpec *cgroup.CgroupSpec, namespaceSpec *namespace.NamespaceSpec, fsRoot string, networkConfig *network.NetworkConfig) {
 	if os.Geteuid() != 0 {
 		fmt.Fprintf(os.Stderr, "spocker: need root privileges\n")
 		os.Exit(1)

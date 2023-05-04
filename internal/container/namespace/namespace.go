@@ -1,5 +1,4 @@
-// Package container provides functions for creating a container.
-package container
+package namespace
 
 import (
 	"context"

@@ -1,6 +1,6 @@
 # Spocker
 
-Spocker is a lightweight container runtime tool that provides basic containerization features, allowing you to run processes within a sandboxed environment, isolating them from the host system. Spocker supports limiting resources such as memory, CPU shares, and block I/O weight, as well as providing namespace isolation and basic networking features.
+This library provides a Go implementation for creating and managing Linux containers. It allows you to create namespaces, cgroups, and networks for running isolated processes in a containerized environment.
 
 The tool is controlled through a command-line interface and accepts various flags to customize the container environment, including flags for setting memory limits, CPU shares, block I/O weight, cgroup and namespace names, namespace types, filesystem root, and network configuration.
 

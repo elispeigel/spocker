@@ -1,51 +1,48 @@
-/**
-* Package container provides functionalities for setting up a container environment, including cgroups,
-* namespaces, filesystems, networks, and running commands inside the container. The Run function sets up
-* the container environment and runs the specified command. It uses cgroups to manage system resources,
-* namespaces to isolate the container's processes, filesystems to isolate the container's filesystem, and
-* networks to isolate the container's network stack.
-*/
 package container
 
 import (
 	"fmt"
-	// "os"
 	"os/exec"
 	"syscall"
+
+	"github.com/elispeigel/spocker/internal/container/cgroup"
+	"github.com/elispeigel/spocker/internal/container/filesystem"
+	"github.com/elispeigel/spocker/internal/container/namespace"
+	"github.com/elispeigel/spocker/internal/container/network"
 )
 
 // Run sets up the container environment and runs the specified command.
-func Run(cmd *exec.Cmd, cgroupSpec *CgroupSpec, namespaceSpec *NamespaceSpec, fsRoot string, networkConfig *NetworkConfig) error {
+func Run(cmd *exec.Cmd, cgroupSpec *cgroup.CgroupSpec, namespaceSpec *namespace.NamespaceSpec, fsRoot string, networkConfig *network.NetworkConfig) error {
 	// Set up cgroups, namespaces, or any other container settings here
-	subsystems := []Subsystem{&CPUSubsystem{}, &MemorySubsystem{}, &BlkIOSubsystem{}}
-	factory := NewDefaultCgroupFactory(subsystems)
+	subsystems := []cgroup.Subsystem{&cgroup.CPUSubsystem{}, &cgroup.MemorySubsystem{}, &cgroup.BlkIOSubsystem{}}
+	factory := cgroup.NewDefaultCgroupFactory(subsystems)
 	cgroup, err := factory.CreateCgroup(cgroupSpec)
 	if err != nil {
 		return fmt.Errorf("failed to create cgroup: %v", err)
 	}
 	defer cgroup.Close()
 
-	namespace, err := NewNamespace(namespaceSpec)
+	container_namespace, err := namespace.NewNamespace(namespaceSpec)
 	if err != nil {
 		return fmt.Errorf("failed to create namespace: %v", err)
 	}
-	defer namespace.Close()
+	defer container_namespace.Close()
 
 	// Set up the container's filesystem
-	fs, err := NewFilesystem(fsRoot)
+	fs, err := filesystem.NewFilesystem(fsRoot)
 	if err != nil {
 		return fmt.Errorf("failed to create filesystem: %v", err)
 	}
 
 	// Set up the container's network
-	network, err := CreateNetwork(networkConfig)
+	container_network, err := network.CreateNetwork(networkConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create network: %v", err)
 	}
-	defer DeleteNetwork(network.Name)
+	defer network.DeleteNetwork(container_network.Name)
 
 	// Configure the container's hostname
-	if err := SetHostname("your-container-hostname"); err != nil {
+	if err := namespace.SetHostname("your-container-hostname"); err != nil {
 		return fmt.Errorf("failed to set hostname: %v", err)
 	}
 

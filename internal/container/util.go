@@ -1,4 +1,3 @@
-// Package container provides functions for creating a container.
 package container
 
 import (
@@ -6,8 +5,6 @@ import (
 	"fmt"
 	"os/exec"
 )
-
-
 
 // AllowedCommands is a list of allowed commands.
 var AllowedCommands = map[string]bool{

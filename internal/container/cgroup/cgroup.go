@@ -1,7 +1,4 @@
-// Package container provides a set of utilities to manage Linux control groups (cgroups).
-// This package allows the creation and management of cgroups, applying resource limits,
-// and running processes within those cgroups.
-package container
+package cgroup
 
 import (
 	"bufio"

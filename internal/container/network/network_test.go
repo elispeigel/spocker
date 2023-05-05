@@ -18,7 +18,8 @@ func TestCreateNetwork(t *testing.T) {
 		DNS:     []net.IP{net.ParseIP("8.8.8.8")},
 		DHCP:    false,
 	}
-	net1, err1 := CreateNetwork(config1)
+	handler1 := DefaultNetworkHandler{}
+	net1, err1 := CreateNetwork(config1, handler1)
 	if err1 != nil {
 		t.Errorf("Test case 1 failed: %v", err1)
 	}
@@ -35,7 +36,8 @@ func TestCreateNetwork(t *testing.T) {
 		DHCP:     true,
 		DHCPArgs: []string{},
 	}
-	net2, err2 := CreateNetwork(config2)
+	handler2 := DefaultNetworkHandler{}
+	net2, err2 := CreateNetwork(config2, handler2)
 	if err2 != nil {
 		t.Errorf("Test case 2 failed: %v", err2)
 	}
@@ -51,7 +53,8 @@ func TestCreateNetwork(t *testing.T) {
 			Mask: net.CIDRMask(24, 32),
 		},
 	}
-	_, err3 := CreateNetwork(config3)
+	handler3 := DefaultNetworkHandler{}
+	_, err3 := CreateNetwork(config3, handler3)
 	if err3 == nil {
 		t.Errorf("Test case 3 failed: expected error but got nil")
 	}
@@ -71,7 +74,8 @@ func TestGetAvailableIP(t *testing.T) {
 	}
 
 	// Call GetAvailableIP and make sure it returns a valid IP address
-	ip, err := GetAvailableIP(ipNet)
+	handler := DefaultNetworkHandler{}
+	ip, err := GetAvailableIP(ipNet, handler)
 	if err != nil {
 		t.Fatalf("GetAvailableIP returned an error: %v", err)
 	}
@@ -81,7 +85,7 @@ func TestGetAvailableIP(t *testing.T) {
 	if !ipNet.Contains(ip) {
 		t.Fatalf("GetAvailableIP returned an IP outside of the subnet range: %v", ip)
 	}
-	if IsIPInUse(ip) {
+	if IsIPInUse(ip, handler) {
 		t.Fatalf("GetAvailableIP returned an IP that is already in use: %v", ip)
 	}
 }
@@ -96,14 +100,15 @@ func TestIsIPInUse(t *testing.T) {
 	defer os.Unsetenv(fmt.Sprintf("IP_IN_USE_%s", inUseIP))
 
 	// Test that the in-use IP address is detected as being in use
-	if !IsIPInUse(inUseAddr) {
+	handler := DefaultNetworkHandler{}
+	if !IsIPInUse(inUseAddr, handler) {
 		t.Fatalf("IsIPInUse failed to detect an in-use IP address: %v", inUseAddr)
 	}
 
 	// Test that a different IP address is detected as not being in use
 	unusedIP := "192.168.1.2"
 	unusedAddr := net.ParseIP(unusedIP)
-	if IsIPInUse(unusedAddr) {
+	if IsIPInUse(unusedAddr, handler) {
 		t.Fatalf("IsIPInUse incorrectly detected an unused IP address as being in use: %v", unusedAddr)
 	}
 }
@@ -115,7 +120,8 @@ func TestGetDefaultGateway(t *testing.T) {
 		Mask: net.IPv4Mask(255, 255, 255, 0),
 	}
 
-	gateway := GetDefaultGateway(ipNet)
+	handler := DefaultNetworkHandler{}
+	gateway := GetDefaultGateway(ipNet, handler)
 
 	if gateway == nil {
 		t.Errorf("GetDefaultGateway returned nil, expected %v", expectedGateway)

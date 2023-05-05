@@ -36,13 +36,38 @@ type Network struct {
 	DHCP    bool
 }
 
+type NetworkHandler interface {
+	InterfaceByName(name string) (*net.Interface, error)
+	RouteList(link netlink.Link, family int) ([]netlink.Route, error)
+	DialTimeout(network, address string, timeout time.Duration) (net.Conn, error)
+	ResolveUDPAddr(network, address string) (*net.UDPAddr, error)
+}
+
+type DefaultNetworkHandler struct{}
+
+func (dnh DefaultNetworkHandler) InterfaceByName(name string) (*net.Interface, error) {
+	return net.InterfaceByName(name)
+}
+
+func (dnh DefaultNetworkHandler) RouteList(link netlink.Link, family int) ([]netlink.Route, error) {
+	return netlink.RouteList(link, family)
+}
+
+func (dnh DefaultNetworkHandler) DialTimeout(network, address string, timeout time.Duration) (net.Conn, error) {
+	return net.DialTimeout(network, address, timeout)
+}
+
+func (dnh DefaultNetworkHandler) ResolveUDPAddr(network, address string) (*net.UDPAddr, error) {
+	return net.ResolveUDPAddr(network, address)
+}
+
 // CreateNetwork creates a new container network.
-func CreateNetwork(config *NetworkConfig) (*Network, error) {
+func CreateNetwork(config *NetworkConfig, handler NetworkHandler) (*Network, error) {
 	if config == nil || config.IPNet == nil {
 		return nil, fmt.Errorf("invalid network configuration")
 	}
 
-	if _, err := net.InterfaceByName(config.Name); err == nil {
+	if _, err := handler.InterfaceByName(config.Name); err == nil {
 		return nil, fmt.Errorf("network already exists: %w", err)
 	}
 
@@ -51,7 +76,7 @@ func CreateNetwork(config *NetworkConfig) (*Network, error) {
 			IP:   net.ParseIP("::1"),
 			Port: dhcpv6.DefaultServerPort,
 		}
-		server, err := server6.NewServer("", laddr, handler)
+		server, err := server6.NewServer("", laddr, dhcpHandler)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -60,7 +85,7 @@ func CreateNetwork(config *NetworkConfig) (*Network, error) {
 			return nil, fmt.Errorf("failed to start DHCP server: %v", err)
 		}
 	} else {
-		ip, err := GetAvailableIP(config.IPNet)
+		ip, err := GetAvailableIP(config.IPNet, handler)
 		if err != nil {
 			return nil, fmt.Errorf("failed to assign IP address to container: %v", err)
 		}
@@ -69,7 +94,7 @@ func CreateNetwork(config *NetworkConfig) (*Network, error) {
 
 	gateway := config.Gateway
 	if gateway == nil {
-		gateway = GetDefaultGateway(config.IPNet)
+		gateway = GetDefaultGateway(config.IPNet, handler)
 	}
 
 	dns := config.DNS
@@ -88,13 +113,13 @@ func CreateNetwork(config *NetworkConfig) (*Network, error) {
 	return network, nil
 }
 
-func handler(conn net.PacketConn, peer net.Addr, m dhcpv6.DHCPv6) {
+func dhcpHandler(conn net.PacketConn, peer net.Addr, m dhcpv6.DHCPv6) {
 	// this function will just print the received DHCPv6 message, without replying
 	log.Print(m.Summary())
 }
 
 // GetAvailableIP finds and returns an available IP address in the given IPNet subnet range.
-func GetAvailableIP(ipNet *net.IPNet) (net.IP, error) {
+func GetAvailableIP(ipNet *net.IPNet, handler NetworkHandler) (net.IP, error) {
 	ipRange := ipNet.IP.Mask(ipNet.Mask)
 
 	ones, bits := ipNet.Mask.Size()
@@ -112,17 +137,18 @@ func GetAvailableIP(ipNet *net.IPNet) (net.IP, error) {
 		ip := net.IP(ipInt.Bytes())
 
 		// Check if the IP address is available
-		if !IsIPInUse(ip) {
+		if !IsIPInUse(ip, handler) {
 			return ip, nil
 		}
 	}
 
 	return nil, fmt.Errorf("no available IP address in subnet range")
+
 }
 
 // IsIPInUse checks if the given IP address is already in use.
-func IsIPInUse(ip net.IP) bool {
-	conn, err := net.DialTimeout("ip4:icmp", ip.String(), time.Second)
+func IsIPInUse(ip net.IP, handler NetworkHandler) bool {
+	conn, err := handler.DialTimeout("ip4:icmp", ip.String(), time.Second)
 	if err != nil {
 		return true
 	}
@@ -134,8 +160,8 @@ func IsIPInUse(ip net.IP) bool {
 }
 
 // GetDefaultGateway returns the default gateway IP address for the given IPNet subnet.
-func GetDefaultGateway(ipNet *net.IPNet) net.IP {
-	iface, err := net.InterfaceByIndex(1) // assuming the first interface is the default one
+func GetDefaultGateway(ipNet *net.IPNet, handler NetworkHandler) net.IP {
+	iface, err := handler.InterfaceByName("eth0") // assuming the first interface is the default one
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -149,7 +175,7 @@ func GetDefaultGateway(ipNet *net.IPNet) net.IP {
 		switch addr := addr.(type) {
 		case *net.IPNet:
 			if addr.Contains(ipNet.IP) {
-				routes, err := netlink.RouteList(nil, netlink.FAMILY_ALL)
+				routes, err := handler.RouteList(nil, netlink.FAMILY_ALL)
 				if err != nil {
 					log.Fatal(err)
 				}
@@ -205,6 +231,7 @@ func GetDefaultDNS() net.IP {
 	}
 
 	return nil
+
 }
 
 // DeleteNetwork deletes an existing container network.

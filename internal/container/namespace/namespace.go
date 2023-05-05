@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"syscall"
+
+	"spocker/internal/container/util"
 )
 
 // NewNamespace returns a new namespace object.
@@ -15,7 +17,7 @@ func NewNamespace(spec *NamespaceSpec) (*Namespace, error) {
 	}
 
 	ctx := context.Background()
-	cmd, err := createCommand(ctx, "/proc/self/exe", "child")
+	cmd, err := util.CreateCommand(ctx, "/proc/self/exe", "child")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create child process: %w", err)
 	}
@@ -57,7 +59,7 @@ func (ns *Namespace) Enter() error {
 	}
 
 	ctx := context.Background()
-	cmd, err := createCommand(ctx, "/bin/sh", "-i")
+	cmd, err := util.CreateCommand(ctx, "/bin/sh", "-i")
 	if err != nil {
 		return fmt.Errorf("failed to create command: %w", err)
 	}
@@ -101,7 +103,7 @@ type NamespaceSpec struct {
 func SetHostname(hostname string) error {
 
 	ctx := context.Background()
-	cmd, err := createCommand(ctx, "sudo", "hostnamectl", "set-hostname", hostname)
+	cmd, err := util.CreateCommand(ctx, "sudo", "hostnamectl", "set-hostname", hostname)
 	if err != nil {
 		return fmt.Errorf("failed to create command: %w", err)
 	}

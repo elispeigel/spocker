@@ -24,7 +24,7 @@ jobs:
         go-version: 'stable'
 
     - name: Build
-      run: go build -v ./...
+      run: GOOS=linux GOARCH=amd64 go build -v ./...
     
     - name: Run Gosec Security Scanner
       continue-on-error: true

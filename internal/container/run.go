@@ -5,17 +5,32 @@ import (
 	"os/exec"
 	"syscall"
 
-	"github.com/elispeigel/spocker/internal/container/cgroup"
-	"github.com/elispeigel/spocker/internal/container/filesystem"
-	"github.com/elispeigel/spocker/internal/container/namespace"
-	"github.com/elispeigel/spocker/internal/container/network"
+	"spocker/internal/container/cgroup"
+	"spocker/internal/container/filesystem"
+	"spocker/internal/container/namespace"
+	"spocker/internal/container/network"
+
+	"go.uber.org/zap"
 )
+
+type ContainerRunner interface {
+	Start() error
+	Wait() error
+}
+
 
 // Run sets up the container environment and runs the specified command.
 func Run(cmd *exec.Cmd, cgroupSpec *cgroup.CgroupSpec, namespaceSpec *namespace.NamespaceSpec, fsRoot string, networkConfig *network.NetworkConfig) error {
+	logger, _ := zap.NewProduction()
+	defer func() {
+		if syncErr := logger.Sync(); syncErr != nil {
+			fmt.Printf("Error syncing logger: %v\n", syncErr)
+		}
+	}()
 	// Set up cgroups, namespaces, or any other container settings here
 	subsystems := []cgroup.Subsystem{&cgroup.CPUSubsystem{}, &cgroup.MemorySubsystem{}, &cgroup.BlkIOSubsystem{}}
-	factory := cgroup.NewDefaultCgroupFactory(subsystems)
+	fileHandler := &cgroup.DefaultFileHandler{}
+	factory := cgroup.NewDefaultCgroupFactory(subsystems, fileHandler)
 	cgroup, err := factory.CreateCgroup(cgroupSpec)
 	if err != nil {
 		return fmt.Errorf("failed to create cgroup: %v", err)
@@ -35,11 +50,18 @@ func Run(cmd *exec.Cmd, cgroupSpec *cgroup.CgroupSpec, namespaceSpec *namespace.
 	}
 
 	// Set up the container's network
-	container_network, err := network.CreateNetwork(networkConfig)
+	networkHandler := network.DefaultNetworkHandler{}
+	container_network, err := network.CreateNetwork(networkConfig, networkHandler)
 	if err != nil {
 		return fmt.Errorf("failed to create network: %v", err)
 	}
-	defer network.DeleteNetwork(container_network.Name)
+
+	defer func() {
+		err := network.DeleteNetwork(container_network.Name)
+		if err != nil {
+			logger.Error("Failed to delete network", zap.Error(err))
+		}
+	}()
 
 	// Configure the container's hostname
 	if err := namespace.SetHostname("your-container-hostname"); err != nil {

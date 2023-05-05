@@ -1,17 +1,3 @@
-// Spocker is a lightweight container runtime tool that provides basic
-// containerization features. It allows you to run processes within a sandboxed
-// environment, isolating them from the host system. Spocker supports
-// limiting resources such as memory, CPU shares, and block I/O weight, as well
-// as providing namespace isolation and basic networking features.
-
-// The tool is controlled through a command-line interface and accepts various
-// flags to customize the container environment. These include flags for setting
-// memory limits, CPU shares, block I/O weight, cgroup and namespace names,
-// namespace types, filesystem root, and network configuration.
-
-// Spocker requires root privileges to execute and leverages Linux kernel
-// features such as cgroups, namespaces, and network namespaces to provide
-// containerization.
 package main
 
 import (
@@ -23,10 +9,11 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/elispeigel/spocker/internal/container"
-	"github.com/elispeigel/spocker/internal/container/cgroup"
-	"github.com/elispeigel/spocker/internal/container/namespace"
-	"github.com/elispeigel/spocker/internal/container/network"
+	"spocker/internal/container"
+	"spocker/internal/container/cgroup"
+	"spocker/internal/container/namespace"
+	"spocker/internal/container/network"
+	"go.uber.org/zap"
 )
 
 func usage() {
@@ -35,6 +22,9 @@ func usage() {
 }
 
 func main() {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
 	flag.Usage = usage
 
 	memoryLimitFlag := flag.String("memory-limit", "", "Memory limit for the container in bytes")
@@ -59,17 +49,17 @@ func main() {
 	case "run":
 		memoryLimit, err := strconv.Atoi(*memoryLimitFlag)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "spocker: invalid memory limit: %s\n", *memoryLimitFlag)
+			logger.Error("spocker: invalid memory limit", zap.String("memory limit", *memoryLimitFlag))
 			os.Exit(1)
 		}
 		cpuShares, err := strconv.Atoi(*cpuSharesFlag)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "spocker: invalid CPU shares: %s\n", *cpuSharesFlag)
+			logger.Error("spocker: invalid CPU shares", zap.String("CPU shares", *cpuSharesFlag))
 			os.Exit(1)
 		}
 		blkioWeight, err := strconv.Atoi(*blkioWeightFlag)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "spocker: invalid block I/O weight: %s\n", *blkioWeightFlag)
+			logger.Error("spocker: invalid block I/O weight", zap.String("block I/O weight", *blkioWeightFlag))
 			os.Exit(1)
 		}
 
@@ -95,13 +85,13 @@ func main() {
 
 		_, ipNet, err := net.ParseCIDR(*networkIPCIDRFlag)
 		if err != nil {
-			fmt.Println("Invalid CIDR:", err)
+			logger.Error("Invalid CIDR", zap.String("CIDR", *networkIPCIDRFlag), zap.Error(err))
 			return
 		}
 
 		networkConfig := &network.NetworkConfig{
-			Name:  *networkNameFlag,
-			IPNet: ipNet,
+			Name:    *networkNameFlag,
+			IPNet:   ipNet,
 			Gateway: net.ParseIP(*networkGatewayFlag),
 		}
 
@@ -113,8 +103,11 @@ func main() {
 }
 
 func run(cgroupSpec *cgroup.CgroupSpec, namespaceSpec *namespace.NamespaceSpec, fsRoot string, networkConfig *network.NetworkConfig) {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
 	if os.Geteuid() != 0 {
-		fmt.Fprintf(os.Stderr, "spocker: need root privileges\n")
+		logger.Error("spocker: need root privileges")
 		os.Exit(1)
 	}
 
@@ -127,7 +120,7 @@ func run(cgroupSpec *cgroup.CgroupSpec, namespaceSpec *namespace.NamespaceSpec, 
 	cmd.Stderr = os.Stderr
 
 	if err := container.Run(cmd, cgroupSpec, namespaceSpec, fsRoot, networkConfig); err != nil {
-		fmt.Fprintf(os.Stderr, "spocker: %v\n", err)
+		logger.Error("spocker: error running container", zap.Error(err))
 		os.Exit(1)
 	}
 }

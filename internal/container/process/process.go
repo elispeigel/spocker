@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	"spocker/internal/container/util"
 )
 
 // Process is a struct representing a container process.// Process represents a container process.
@@ -17,10 +19,30 @@ type Process struct {
 	cmd *exec.Cmd
 }
 
+type ProcessHandler interface {
+	Getpid() int
+	FindProcess(pid int) (*os.Process, error)
+	Getppid() int
+}
+
+type DefaultProcessHandler struct{}
+
+func (dph DefaultProcessHandler) Getpid() int {
+	return syscall.Getpid()
+}
+
+func (dph DefaultProcessHandler) FindProcess(pid int) (*os.Process, error) {
+	return os.FindProcess(pid)
+}
+
+func (dph DefaultProcessHandler) Getppid() int {
+	return syscall.Getppid()
+}
+
 // NewProcess creates a new container process based on the given ProcessSpec.
 func NewProcess(spec *ProcessSpec) (*Process, error) {
 	ctx := context.Background()
-	cmd, err := createCommand(ctx, spec.Path, spec.Args...)
+	cmd, err := util.CreateCommand(ctx, spec.Path, spec.Args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create command: %w", err)
 	}

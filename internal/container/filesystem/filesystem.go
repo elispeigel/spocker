@@ -1,4 +1,3 @@
-// Package container provides functions for creating a container.
 package filesystem
 
 import (
@@ -7,7 +6,11 @@ import (
 	"os"
 	"path/filepath"
 	"syscall"
+
+	"go.uber.org/zap"
 )
+
+var logger, _ = zap.NewProduction()
 
 // Mount is a struct representing a mount in the container's filesystem.
 type Mount struct {
@@ -20,6 +23,12 @@ type Mount struct {
 // Filesystem is an abstraction over a container's filesystem.
 type Filesystem struct {
 	Root string
+}
+
+type FilesystemHandler interface {
+    Stat(name string) (os.FileInfo, error)
+    Create(name string) (*os.File, error)
+    Remove(name string) error
 }
 
 // NewFilesystem creates a new filesystem object for the given root directory.
@@ -107,7 +116,7 @@ func (fs *Filesystem) CopyFile(src string, dst string) error {
 	defer func() {
 		errSrcClose := srcFile.Close()
 		if errSrcClose != nil {
-			fmt.Printf("failed to close source file %q: %v", src, errSrcClose)
+			logger.Error("failed to close source file", zap.String("src", src), zap.Error(errSrcClose))
 		}
 	}()
 
@@ -128,7 +137,7 @@ func (fs *Filesystem) CopyFile(src string, dst string) error {
 	defer func() {
 		errDstClose := dstFile.Close()
 		if errDstClose != nil {
-			fmt.Printf("failed to close destination file %q: %v", dst, errDstClose)
+			logger.Error("failed to close destination file", zap.String("dst", dst), zap.Error(errDstClose))
 		}
 	}()
 

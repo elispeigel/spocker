@@ -5,32 +5,31 @@ name: Go
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
-
   build:
     runs-on: ubuntu-latest
     env:
       GO111MODULE: on
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-    - name: Set up Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: 'stable'
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: "stable"
 
-    - name: Build
-      run: GOOS=linux GOARCH=amd64 go build -v ./...
-    
-    - name: Run Gosec Security Scanner
-      continue-on-error: true
-      uses: securego/gosec@master
-      with:
-        args: ./...
+      - name: Build
+        run: GOOS=linux GOARCH=amd64 go build -v ./...
 
-    - name: Test
-      run: sudo go test -v ./...
+      - name: Run Gosec Security Scanner
+        continue-on-error: true
+        uses: securego/gosec@master
+        with:
+          args: ./...
+
+      - name: Test
+        run: sudo go test -v ./...

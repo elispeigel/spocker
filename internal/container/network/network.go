@@ -2,11 +2,10 @@ package network
 
 import (
 	"bufio"
+	"crypto/rand"
 	"fmt"
 	"log"
-	"math"
 	"math/big"
-	"math/rand"
 	"net"
 	"os"
 	"strings"
@@ -123,17 +122,16 @@ func GetAvailableIP(ipNet *net.IPNet, handler NetworkHandler) (net.IP, error) {
 	ipRange := ipNet.IP.Mask(ipNet.Mask)
 
 	ones, bits := ipNet.Mask.Size()
-	ipSpace := int(math.Pow(2, float64(bits-ones)))
-
-	// Create a new random number generator with a specific seed
-	randSrc := rand.NewSource(time.Now().UnixNano())
-	randGen := rand.New(randSrc)
+	ipSpace := big.NewInt(1 << uint(bits-ones))
 
 	// Try up to 10 random addresses
 	for i := 0; i < 10; i++ {
 		// Generate a random IP address within the subnet range
-		randInt := randGen.Intn(ipSpace)
-		ipInt := big.NewInt(0).Add(big.NewInt(int64(randInt)), big.NewInt(0).SetBytes(ipRange.To4()))
+		randInt, err := rand.Int(rand.Reader, ipSpace)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate random IP address: %v", err)
+		}
+		ipInt := big.NewInt(0).Add(randInt, big.NewInt(0).SetBytes(ipRange.To4()))
 		ip := net.IP(ipInt.Bytes())
 
 		// Check if the IP address is available
@@ -143,7 +141,6 @@ func GetAvailableIP(ipNet *net.IPNet, handler NetworkHandler) (net.IP, error) {
 	}
 
 	return nil, fmt.Errorf("no available IP address in subnet range")
-
 }
 
 // IsIPInUse checks if the given IP address is already in use.

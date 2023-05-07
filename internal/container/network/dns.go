@@ -68,7 +68,10 @@ func configureDNS(containerID, dns string) error {
 	}
 
 	// Set a read timeout for the response
-	udpConn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	err = udpConn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	if err != nil {
+		return fmt.Errorf("failed to set a read timeout for the response: %w", err)
+	}
 
 	// Read the DNS response
 	response := make([]byte, 512)

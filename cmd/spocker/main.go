@@ -13,6 +13,7 @@ import (
 	"spocker/internal/container/cgroup"
 	"spocker/internal/container/namespace"
 	"spocker/internal/container/network"
+
 	"go.uber.org/zap"
 )
 
@@ -63,7 +64,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		cgroupSpec := &cgroup.CgroupSpec{
+		cgroupSpec := &cgroup.Spec{
 			Name: *cgroupNameFlag,
 			Resources: &cgroup.Resources{
 				Memory: &cgroup.Memory{
@@ -89,7 +90,7 @@ func main() {
 			return
 		}
 
-		networkConfig := &network.NetworkConfig{
+		networkConfig := &network.Config{
 			Name:    *networkNameFlag,
 			IPNet:   ipNet,
 			Gateway: net.ParseIP(*networkGatewayFlag),
@@ -102,7 +103,7 @@ func main() {
 	}
 }
 
-func run(cgroupSpec *cgroup.CgroupSpec, namespaceSpec *namespace.NamespaceSpec, fsRoot string, networkConfig *network.NetworkConfig) {
+func run(cgroupSpec *cgroup.Spec, namespaceSpec *namespace.NamespaceSpec, fsRoot string, networkConfig *network.Config) {
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
 

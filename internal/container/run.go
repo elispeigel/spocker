@@ -18,9 +18,8 @@ type ContainerRunner interface {
 	Wait() error
 }
 
-
 // Run sets up the container environment and runs the specified command.
-func Run(cmd *exec.Cmd, cgroupSpec *cgroup.CgroupSpec, namespaceSpec *namespace.NamespaceSpec, fsRoot string, networkConfig *network.NetworkConfig) error {
+func Run(cmd *exec.Cmd, cgroupSpec *cgroup.Spec, namespaceSpec *namespace.NamespaceSpec, fsRoot string, networkConfig *network.Config) error {
 	logger, _ := zap.NewProduction()
 	defer func() {
 		if syncErr := logger.Sync(); syncErr != nil {
@@ -30,7 +29,7 @@ func Run(cmd *exec.Cmd, cgroupSpec *cgroup.CgroupSpec, namespaceSpec *namespace.
 	// Set up cgroups, namespaces, or any other container settings here
 	subsystems := []cgroup.Subsystem{&cgroup.CPUSubsystem{}, &cgroup.MemorySubsystem{}, &cgroup.BlkIOSubsystem{}}
 	fileHandler := &cgroup.DefaultFileHandler{}
-	factory := cgroup.NewDefaultCgroupFactory(subsystems, fileHandler)
+	factory := cgroup.NewDefaultFactory(subsystems, fileHandler)
 	cgroup, err := factory.CreateCgroup(cgroupSpec)
 	if err != nil {
 		return fmt.Errorf("failed to create cgroup: %v", err)

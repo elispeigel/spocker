@@ -1,3 +1,4 @@
+// cgroup package manages Linux control groups (cgroups) and provides functionality to apply resource limitations.
 package cgroup
 
 import (
@@ -8,7 +9,7 @@ import (
 )
 
 func TestCgroup(t *testing.T) {
-	cgroupSpec := NewCgroupSpecBuilder().
+	cgroupSpec := NewSpecBuilder().
 		WithName("testcgroup").
 		WithResources(&Resources{
 			Memory: &Memory{
@@ -27,7 +28,7 @@ func TestCgroup(t *testing.T) {
 	// Create a new cgroup
 	subsystems := []Subsystem{&CPUSubsystem{}, &MemorySubsystem{}, &BlkIOSubsystem{}}
 	fileHandler := &DefaultFileHandler{}
-	factory := NewDefaultCgroupFactory(subsystems, fileHandler)
+	factory := NewDefaultFactory(subsystems, fileHandler)
 	cgroup, err := factory.CreateCgroup(cgroupSpec)
 	if err != nil {
 		t.Fatalf("failed to create cgroup: %v", err)

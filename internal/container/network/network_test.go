@@ -11,7 +11,7 @@ import (
 
 func TestCreateNetwork(t *testing.T) {
 	// Test case 1: valid network configuration with static IP
-	config1 := &NetworkConfig{
+	config1 := &Config{
 		Name:    "testnet1",
 		IPNet:   &net.IPNet{IP: net.ParseIP("192.168.0.0"), Mask: net.CIDRMask(24, 32)},
 		Gateway: net.ParseIP("192.168.0.1"),
@@ -28,7 +28,7 @@ func TestCreateNetwork(t *testing.T) {
 	}
 
 	// Test case 2: valid network configuration with DHCP
-	config2 := &NetworkConfig{
+	config2 := &Config{
 		Name:     "testnet2",
 		IPNet:    &net.IPNet{IP: net.ParseIP("192.168.1.0"), Mask: net.CIDRMask(24, 32)},
 		Gateway:  net.ParseIP("192.168.1.1"),
@@ -46,7 +46,7 @@ func TestCreateNetwork(t *testing.T) {
 	}
 
 	// Test case 3: invalid network configuration
-	config3 := &NetworkConfig{
+	config3 := &Config{
 		Name: "testnet3",
 		IPNet: &net.IPNet{
 			IP:   net.ParseIP("192.168.2.0"),
@@ -85,7 +85,7 @@ func TestGetAvailableIP(t *testing.T) {
 	if !ipNet.Contains(ip) {
 		t.Fatalf("GetAvailableIP returned an IP outside of the subnet range: %v", ip)
 	}
-	if IsIPInUse(ip, handler) {
+	if IsIPInUse(ip) {
 		t.Fatalf("GetAvailableIP returned an IP that is already in use: %v", ip)
 	}
 }
@@ -100,15 +100,14 @@ func TestIsIPInUse(t *testing.T) {
 	defer os.Unsetenv(fmt.Sprintf("IP_IN_USE_%s", inUseIP))
 
 	// Test that the in-use IP address is detected as being in use
-	handler := DefaultNetworkHandler{}
-	if !IsIPInUse(inUseAddr, handler) {
+	if !IsIPInUse(inUseAddr) {
 		t.Fatalf("IsIPInUse failed to detect an in-use IP address: %v", inUseAddr)
 	}
 
 	// Test that a different IP address is detected as not being in use
 	unusedIP := "192.168.1.2"
 	unusedAddr := net.ParseIP(unusedIP)
-	if IsIPInUse(unusedAddr, handler) {
+	if IsIPInUse(unusedAddr) {
 		t.Fatalf("IsIPInUse incorrectly detected an unused IP address as being in use: %v", unusedAddr)
 	}
 }
@@ -121,7 +120,10 @@ func TestGetDefaultGateway(t *testing.T) {
 	}
 
 	handler := DefaultNetworkHandler{}
-	gateway := GetDefaultGateway(ipNet, handler)
+	gateway, err := GetDefaultGateway(ipNet, handler)
+	if err != nil {
+		t.Errorf("GetDefaultGateway returned %v, expected nil", expectedGateway)
+	}
 
 	if gateway == nil {
 		t.Errorf("GetDefaultGateway returned nil, expected %v", expectedGateway)
@@ -149,7 +151,10 @@ func TestGetDefaultDNS(t *testing.T) {
 
 	// Test the GetDefaultDNS function with the temporary file
 	expected := net.ParseIP("8.8.8.8")
-	actual := GetDefaultDNS()
+	actual, err := GetDefaultDNS()
+	if err != nil {
+		t.Fatalf("Failed to get default DNA: %v", err)
+	}
 	if actual == nil {
 		t.Errorf("GetDefaultDNS returned nil")
 	} else if !actual.Equal(expected) {

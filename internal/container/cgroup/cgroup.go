@@ -1,3 +1,4 @@
+// cgroup package manages Linux control groups (cgroups) and provides functionality to apply resource limitations.
 package cgroup
 
 import (
@@ -56,15 +57,6 @@ func NewCgroup(spec *Spec, subsystems []Subsystem, fileHandler FileHandler) (*Cg
 		CgroupRoot:  cgroupRoot,
 		fileHandler: fileHandler,
 	}, nil
-}
-
-// Cgroup is an abstraction over a Linux control group.
-// It contains the name of the cgroup, a file descriptor for the tasks file, and the root path to the cgroup.
-type Cgroup struct {
-	Name        string
-	File        *os.File
-	CgroupRoot  string
-	fileHandler FileHandler
 }
 
 // Set sets the value of the specified control for the cgroup.

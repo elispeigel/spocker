@@ -1,3 +1,4 @@
+// cgroup package manages Linux control groups (cgroups) and provides functionality to apply resource limitations.
 package cgroup
 
 import (

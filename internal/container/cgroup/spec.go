@@ -1,3 +1,4 @@
+// cgroup package manages Linux control groups (cgroups) and provides functionality to apply resource limitations.
 package cgroup
 
 // Spec represents the specification for a Linux control group.

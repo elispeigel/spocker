@@ -1,3 +1,4 @@
+// cgroup package manages Linux control groups (cgroups) and provides functionality to apply resource limitations.
 package cgroup
 
 import (
@@ -6,22 +7,12 @@ import (
 	"go.uber.org/zap"
 )
 
-// Factory is an interface for creating Cgroup objects with different configurations based on the Spec provided.
-type Factory interface {
-	CreateCgroup(spec *Spec) (*Cgroup, error)
-}
-
-// DefaultFactory is a struct that implements the Factory interface and creates Cgroups using the specified subsystems.
-type DefaultFactory struct {
-	subsystems  []Subsystem
-	fileHandler FileHandler
-}
-
 // NewDefaultFactory returns a new instance of DefaultFactory with the specified subsystems.
 func NewDefaultFactory(subsystems []Subsystem, fileHandler FileHandler) *DefaultFactory {
 	return &DefaultFactory{subsystems: subsystems, fileHandler: fileHandler}
 }
 
+// CreateCgroup creates a new Cgroup instance based on the provided Spec, using the DefaultFactory's subsystems and fileHandler. Returns an error if the creation fails.
 func (f *DefaultFactory) CreateCgroup(spec *Spec) (*Cgroup, error) {
 	cgroup, err := NewCgroup(spec, f.subsystems, f.fileHandler)
 	if err != nil {

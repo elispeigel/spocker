@@ -85,7 +85,7 @@ func TestGetAvailableIP(t *testing.T) {
 	if !ipNet.Contains(ip) {
 		t.Fatalf("GetAvailableIP returned an IP outside of the subnet range: %v", ip)
 	}
-	if IsIPInUse(ip, handler) {
+	if IsIPInUse(ip) {
 		t.Fatalf("GetAvailableIP returned an IP that is already in use: %v", ip)
 	}
 }
@@ -100,15 +100,14 @@ func TestIsIPInUse(t *testing.T) {
 	defer os.Unsetenv(fmt.Sprintf("IP_IN_USE_%s", inUseIP))
 
 	// Test that the in-use IP address is detected as being in use
-	handler := DefaultNetworkHandler{}
-	if !IsIPInUse(inUseAddr, handler) {
+	if !IsIPInUse(inUseAddr) {
 		t.Fatalf("IsIPInUse failed to detect an in-use IP address: %v", inUseAddr)
 	}
 
 	// Test that a different IP address is detected as not being in use
 	unusedIP := "192.168.1.2"
 	unusedAddr := net.ParseIP(unusedIP)
-	if IsIPInUse(unusedAddr, handler) {
+	if IsIPInUse(unusedAddr) {
 		t.Fatalf("IsIPInUse incorrectly detected an unused IP address as being in use: %v", unusedAddr)
 	}
 }
@@ -121,7 +120,10 @@ func TestGetDefaultGateway(t *testing.T) {
 	}
 
 	handler := DefaultNetworkHandler{}
-	gateway := GetDefaultGateway(ipNet, handler)
+	gateway, err := GetDefaultGateway(ipNet, handler)
+	if err != nil {
+		t.Errorf("GetDefaultGateway returned %v, expected nil", expectedGateway)
+	}
 
 	if gateway == nil {
 		t.Errorf("GetDefaultGateway returned nil, expected %v", expectedGateway)

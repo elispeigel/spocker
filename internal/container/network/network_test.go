@@ -151,7 +151,10 @@ func TestGetDefaultDNS(t *testing.T) {
 
 	// Test the GetDefaultDNS function with the temporary file
 	expected := net.ParseIP("8.8.8.8")
-	actual := GetDefaultDNS()
+	actual, err := GetDefaultDNS()
+	if err != nil {
+		t.Fatalf("Failed to get default DNA: %v", err)
+	}
 	if actual == nil {
 		t.Errorf("GetDefaultDNS returned nil")
 	} else if !actual.Equal(expected) {

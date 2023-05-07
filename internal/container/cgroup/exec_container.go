@@ -35,7 +35,7 @@ func ExecContainer(containerID string, command []string) error {
 		NewMemorySubsystem(fileHandler),
 		NewBlkIOSubsystem(fileHandler),
 	}
-	factory := NewDefaultCgroupFactory(subsystems, fileHandler)
+	factory := NewDefaultFactory(subsystems, fileHandler)
 	cgroup, err := factory.CreateCgroup(cgroupConfig)
 
 	if err != nil {

@@ -29,7 +29,7 @@ func Run(cmd *exec.Cmd, cgroupSpec *cgroup.Spec, namespaceSpec *namespace.Namesp
 	// Set up cgroups, namespaces, or any other container settings here
 	subsystems := []cgroup.Subsystem{&cgroup.CPUSubsystem{}, &cgroup.MemorySubsystem{}, &cgroup.BlkIOSubsystem{}}
 	fileHandler := &cgroup.DefaultFileHandler{}
-	factory := cgroup.NewDefaultCgroupFactory(subsystems, fileHandler)
+	factory := cgroup.NewDefaultFactory(subsystems, fileHandler)
 	cgroup, err := factory.CreateCgroup(cgroupSpec)
 	if err != nil {
 		return fmt.Errorf("failed to create cgroup: %v", err)

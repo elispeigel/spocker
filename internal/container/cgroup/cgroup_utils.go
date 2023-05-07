@@ -99,7 +99,7 @@ func MustLimitMemory(maxMemory int64) {
 		NewMemorySubsystem(fileHandler),
 		NewBlkIOSubsystem(fileHandler),
 	}
-	factory := NewDefaultCgroupFactory(subsystems, fileHandler)
+	factory := NewDefaultFactory(subsystems, fileHandler)
 	cgroup, err := factory.CreateCgroup(cgroupSpec)
 
 	if err != nil {

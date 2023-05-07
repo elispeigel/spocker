@@ -11,18 +11,18 @@ type Factory interface {
 	CreateCgroup(spec *Spec) (*Cgroup, error)
 }
 
-// DefaultCgroupFactory is a struct that implements the CgroupFactory interface and creates Cgroups using the specified subsystems.
-type DefaultCgroupFactory struct {
+// DefaultFactory is a struct that implements the Factory interface and creates Cgroups using the specified subsystems.
+type DefaultFactory struct {
 	subsystems  []Subsystem
 	fileHandler FileHandler
 }
 
-// NewDefaultCgroupFactory returns a new instance of DefaultCgroupFactory with the specified subsystems.
-func NewDefaultCgroupFactory(subsystems []Subsystem, fileHandler FileHandler) *DefaultCgroupFactory {
-	return &DefaultCgroupFactory{subsystems: subsystems, fileHandler: fileHandler}
+// NewDefaultFactory returns a new instance of DefaultFactory with the specified subsystems.
+func NewDefaultFactory(subsystems []Subsystem, fileHandler FileHandler) *DefaultFactory {
+	return &DefaultFactory{subsystems: subsystems, fileHandler: fileHandler}
 }
 
-func (f *DefaultCgroupFactory) CreateCgroup(spec *Spec) (*Cgroup, error) {
+func (f *DefaultFactory) CreateCgroup(spec *Spec) (*Cgroup, error) {
 	cgroup, err := NewCgroup(spec, f.subsystems, f.fileHandler)
 	if err != nil {
 		zap.L().Error("failed to create cgroup", zap.Error(err))

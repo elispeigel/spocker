@@ -27,7 +27,7 @@ func TestCgroup(t *testing.T) {
 	// Create a new cgroup
 	subsystems := []Subsystem{&CPUSubsystem{}, &MemorySubsystem{}, &BlkIOSubsystem{}}
 	fileHandler := &DefaultFileHandler{}
-	factory := NewDefaultCgroupFactory(subsystems, fileHandler)
+	factory := NewDefaultFactory(subsystems, fileHandler)
 	cgroup, err := factory.CreateCgroup(cgroupSpec)
 	if err != nil {
 		t.Fatalf("failed to create cgroup: %v", err)

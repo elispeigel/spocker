@@ -18,9 +18,8 @@ type ContainerRunner interface {
 	Wait() error
 }
 
-
 // Run sets up the container environment and runs the specified command.
-func Run(cmd *exec.Cmd, cgroupSpec *cgroup.CgroupSpec, namespaceSpec *namespace.NamespaceSpec, fsRoot string, networkConfig *network.NetworkConfig) error {
+func Run(cmd *exec.Cmd, cgroupSpec *cgroup.Spec, namespaceSpec *namespace.NamespaceSpec, fsRoot string, networkConfig *network.Config) error {
 	logger, _ := zap.NewProduction()
 	defer func() {
 		if syncErr := logger.Sync(); syncErr != nil {

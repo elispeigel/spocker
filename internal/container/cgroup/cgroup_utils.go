@@ -85,7 +85,7 @@ func SetCgroupParam(cgroupPath string, param string, value string, fileHandler F
 // This function takes a maximum memory value (in bytes) as an argument and limits the memory usage of the current process accordingly.
 func MustLimitMemory(maxMemory int64) {
 	const memoryLimitControl = "memory.limit_in_bytes"
-	cgroupSpec := NewCgroupSpecBuilder().
+	cgroupSpec := NewSpecBuilder().
 		WithName("container").
 		WithResources(&Resources{
 			Memory: &Memory{

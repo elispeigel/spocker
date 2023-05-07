@@ -34,7 +34,7 @@ func (dnh DefaultNetworkHandler) Addrs(iface *net.Interface) ([]net.Addr, error)
 }
 
 // CreateNetwork creates a new container network.
-func CreateNetwork(config *NetworkConfig, handler NetworkHandler) (*Network, error) {
+func CreateNetwork(config *Config, handler NetworkHandler) (*Network, error) {
 	if config == nil || config.IPNet == nil {
 		return nil, fmt.Errorf("invalid network configuration")
 	}

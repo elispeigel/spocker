@@ -1,8 +1,8 @@
 package cgroup
 
-// CgroupSpec represents the specification for a Linux control group.
+// Spec represents the specification for a Linux control group.
 // It contains the name of the cgroup, resources to be allocated, and the root path to the cgroup.
-type CgroupSpec struct {
+type Spec struct {
 	Name       string
 	Resources  *Resources
 	CgroupRoot string
@@ -34,37 +34,37 @@ type Memory struct {
 	Limit int
 }
 
-// CgroupSpecBuilder is a builder for CgroupSpec objects.
-type CgroupSpecBuilder struct {
-	spec *CgroupSpec
+// SpecBuilder is a builder for Spec objects.
+type SpecBuilder struct {
+	spec *Spec
 }
 
-// NewCgroupSpecBuilder creates a new CgroupSpecBuilder.
-func NewCgroupSpecBuilder() *CgroupSpecBuilder {
-	return &CgroupSpecBuilder{
-		spec: &CgroupSpec{},
+// NewSpecBuilder creates a new SpecBuilder.
+func NewSpecBuilder() *SpecBuilder {
+	return &SpecBuilder{
+		spec: &Spec{},
 	}
 }
 
 // WithName sets the name of the cgroup spec.
-func (b *CgroupSpecBuilder) WithName(name string) *CgroupSpecBuilder {
+func (b *SpecBuilder) WithName(name string) *SpecBuilder {
 	b.spec.Name = name
 	return b
 }
 
 // WithResources sets the resources of the cgroup spec.
-func (b *CgroupSpecBuilder) WithResources(resources *Resources) *CgroupSpecBuilder {
+func (b *SpecBuilder) WithResources(resources *Resources) *SpecBuilder {
 	b.spec.Resources = resources
 	return b
 }
 
 // WithCgroupRoot sets the cgroup root of the cgroup spec.
-func (b *CgroupSpecBuilder) WithCgroupRoot(cgroupRoot string) *CgroupSpecBuilder {
+func (b *SpecBuilder) WithCgroupRoot(cgroupRoot string) *SpecBuilder {
 	b.spec.CgroupRoot = cgroupRoot
 	return b
 }
 
 // Build constructs the CgroupSpec object using the provided settings.
-func (b *CgroupSpecBuilder) Build() *CgroupSpec {
+func (b *SpecBuilder) Build() *Spec {
 	return b.spec
 }

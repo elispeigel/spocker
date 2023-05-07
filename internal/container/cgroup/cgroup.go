@@ -10,7 +10,7 @@ import (
 
 // NewCgroup returns a new cgroup object based on the given specification.
 // The cgroup will be created with the specified name, and resources will be limited according to the given resource allocation.
-func NewCgroup(spec *CgroupSpec, subsystems []Subsystem, fileHandler FileHandler) (*Cgroup, error) {
+func NewCgroup(spec *Spec, subsystems []Subsystem, fileHandler FileHandler) (*Cgroup, error) {
 	cgroupRoot := spec.CgroupRoot
 	if cgroupRoot == "" {
 		cgroupRoot = "/sys/fs/cgroup"

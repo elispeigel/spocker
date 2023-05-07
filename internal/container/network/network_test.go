@@ -11,7 +11,7 @@ import (
 
 func TestCreateNetwork(t *testing.T) {
 	// Test case 1: valid network configuration with static IP
-	config1 := &NetworkConfig{
+	config1 := &Config{
 		Name:    "testnet1",
 		IPNet:   &net.IPNet{IP: net.ParseIP("192.168.0.0"), Mask: net.CIDRMask(24, 32)},
 		Gateway: net.ParseIP("192.168.0.1"),
@@ -28,7 +28,7 @@ func TestCreateNetwork(t *testing.T) {
 	}
 
 	// Test case 2: valid network configuration with DHCP
-	config2 := &NetworkConfig{
+	config2 := &Config{
 		Name:     "testnet2",
 		IPNet:    &net.IPNet{IP: net.ParseIP("192.168.1.0"), Mask: net.CIDRMask(24, 32)},
 		Gateway:  net.ParseIP("192.168.1.1"),
@@ -46,7 +46,7 @@ func TestCreateNetwork(t *testing.T) {
 	}
 
 	// Test case 3: invalid network configuration
-	config3 := &NetworkConfig{
+	config3 := &Config{
 		Name: "testnet3",
 		IPNet: &net.IPNet{
 			IP:   net.ParseIP("192.168.2.0"),

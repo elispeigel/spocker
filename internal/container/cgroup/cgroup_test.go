@@ -8,7 +8,7 @@ import (
 )
 
 func TestCgroup(t *testing.T) {
-	cgroupSpec := NewCgroupSpecBuilder().
+	cgroupSpec := NewSpecBuilder().
 		WithName("testcgroup").
 		WithResources(&Resources{
 			Memory: &Memory{

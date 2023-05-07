@@ -6,9 +6,9 @@ import (
 	"go.uber.org/zap"
 )
 
-// CgroupFactory is an interface for creating Cgroup objects with different configurations based on the CgroupSpec provided.
-type CgroupFactory interface {
-	CreateCgroup(spec *CgroupSpec) (*Cgroup, error)
+// Factory is an interface for creating Cgroup objects with different configurations based on the Spec provided.
+type Factory interface {
+	CreateCgroup(spec *Spec) (*Cgroup, error)
 }
 
 // DefaultCgroupFactory is a struct that implements the CgroupFactory interface and creates Cgroups using the specified subsystems.
@@ -22,7 +22,7 @@ func NewDefaultCgroupFactory(subsystems []Subsystem, fileHandler FileHandler) *D
 	return &DefaultCgroupFactory{subsystems: subsystems, fileHandler: fileHandler}
 }
 
-func (f *DefaultCgroupFactory) CreateCgroup(spec *CgroupSpec) (*Cgroup, error) {
+func (f *DefaultCgroupFactory) CreateCgroup(spec *Spec) (*Cgroup, error) {
 	cgroup, err := NewCgroup(spec, f.subsystems, f.fileHandler)
 	if err != nil {
 		zap.L().Error("failed to create cgroup", zap.Error(err))

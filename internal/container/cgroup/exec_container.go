@@ -21,7 +21,7 @@ func ExecContainer(containerID string, command []string) error {
 	}
 
 	// Set up cgroup
-	cgroupConfig := NewCgroupSpecBuilder().
+	cgroupConfig := NewSpecBuilder().
 		WithName(containerID).
 		WithResources(&Resources{
 			Memory: &Memory{

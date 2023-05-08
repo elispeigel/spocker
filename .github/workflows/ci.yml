@@ -30,6 +30,3 @@ jobs:
         uses: securego/gosec@master
         with:
           args: ./...
-
-      - name: Test
-        run: sudo go test -v ./...

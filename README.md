@@ -6,6 +6,9 @@ The tool is controlled through a command-line interface and accepts various flag
 
 Spocker requires root privileges to execute and leverages Linux kernel features such as cgroups, namespaces, and network namespaces to provide containerization.
 
+![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/elispeigel/spocker)
+[![Go Report Card](https://goreportcard.com/badge/github.com/elispeigel/spocker)](https://goreportcard.com/report/github.com/elispeigel/spocker)
+
 ## Installation
 
 Spocker requires a Linux environment to run. To install Spocker, follow these steps:

@@ -90,7 +90,7 @@ type Namespace struct {
 
 // Enter enters the namespace.
 func (ns *Namespace) Enter() error {
-	if err := syscall.Dup2(int(ns.File.Fd()), syscall.Stdin); err != nil {
+	if err := unix.Dup2(int(ns.File.Fd()), syscall.Stdin); err != nil {
 		return fmt.Errorf("failed to duplicate file descriptor to stdin: %w", err)
 	}
 

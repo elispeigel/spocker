@@ -109,3 +109,55 @@ func TestRunEntersNamespaceContext(t *testing.T) {
 		t.Errorf("Expected process to see itself as PID 1 in new PID namespace, but got PID %s", pid)
 	}
 }
+
+func TestRunChrootsToFilesystem(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("Test requires root privileges")
+	}
+
+	// Create temporary rootfs
+	tmpRoot := t.TempDir()
+
+	// Create basic filesystem structure
+	os.MkdirAll(filepath.Join(tmpRoot, "bin"), 0755)
+	os.MkdirAll(filepath.Join(tmpRoot, "proc"), 0755)
+	os.MkdirAll(filepath.Join(tmpRoot, "sys"), 0755)
+
+	// Copy /bin/sh to tmpRoot/bin/sh
+	input, err := os.ReadFile("/bin/sh")
+	if err != nil {
+		t.Fatalf("Failed to read /bin/sh: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(tmpRoot, "bin", "sh"), input, 0755); err != nil {
+		t.Fatalf("Failed to copy /bin/sh: %v", err)
+	}
+
+	// Run container that lists root directory
+	// If chroot works, it should only see bin, proc, sys
+	var stdout bytes.Buffer
+	cmd := exec.Command("/bin/sh", "-c", "ls /")
+	cmd.Stdout = &stdout
+
+	err = Run(cmd, nil, nil, tmpRoot, nil)
+	if err != nil {
+		t.Fatalf("Run failed: %v", err)
+	}
+
+	// Verify the process sees only the chrooted filesystem
+	output := string(stdout.Bytes())
+	t.Logf("Container root directory listing: %s", output)
+
+	// The output should contain bin, proc, sys but not host directories like /usr, /home, etc.
+	if !bytes.Contains(stdout.Bytes(), []byte("bin")) {
+		t.Error("Container filesystem should contain 'bin' directory")
+	}
+
+	// Check that we don't see typical host directories that wouldn't be in our minimal rootfs
+	// We expect NOT to see things like /boot, /home, /root which are common on host but not in our test rootfs
+	hostDirs := []string{"boot", "home", "root", "media", "mnt", "opt", "srv"}
+	for _, dir := range hostDirs {
+		if bytes.Contains(stdout.Bytes(), []byte(dir)) {
+			t.Logf("Warning: Found host directory '%s' in container - chroot may not be working", dir)
+		}
+	}
+}

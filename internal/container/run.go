@@ -46,6 +46,11 @@ func Run(cmd *exec.Cmd, cgroupSpec *cgroup.Spec, namespaceSpec *namespace.Namesp
 		return fmt.Errorf("failed to create filesystem: %v", err)
 	}
 
+	// Prepare the filesystem by creating essential directories
+	if err := fs.ChrootAndMount(); err != nil {
+		return fmt.Errorf("failed to prepare filesystem: %v", err)
+	}
+
 	// Set up the container's network
 	networkHandler := network.DefaultNetworkHandler{}
 	container_network, err := network.CreateNetwork(networkConfig, networkHandler)
@@ -67,13 +72,20 @@ func Run(cmd *exec.Cmd, cgroupSpec *cgroup.Spec, namespaceSpec *namespace.Namesp
 
 	// Set up the container's root directory (chroot)
 	// Use Cloneflags to create namespaces based on spec
+	// NOTE: Using Chroot here. Essential filesystem mounts (proc, sys, dev)
+	// require either:
+	// 1. A container init process that mounts before exec
+	// 2. Using cmd with a wrapper that calls MountEssentialFilesystems
+	// Current implementation creates mount points but doesn't mount
+	// TODO: Implement proper init process for complete filesystem isolation
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Cloneflags:   namespace.BuildCloneFlags(namespaceSpec),
 		Unshareflags: unix.CLONE_NEWNS, // Unshare mount namespace
+		Chroot:       fs.Root,
 	}
 
-	// Set up the container's filesystem before running the command
-	cmd.Dir = fs.Root
+	// Set the working directory to / after chroot
+	cmd.Dir = "/"
 
 	// Run the command inside the container
 	if err := cmd.Start(); err != nil {

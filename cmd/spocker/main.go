@@ -117,9 +117,12 @@ func runContainer(config *Config, logger *zap.Logger) {
 		},
 	}
 
+	// Create namespace spec with standard namespaces enabled
 	namespaceSpec := &namespace.NamespaceSpec{
-		Name: config.NamespaceName,
-		Type: config.NamespaceType,
+		UTS: true,
+		PID: true,
+		MNT: true,
+		NET: true,
 	}
 
 	// Apply default network CIDR if not provided

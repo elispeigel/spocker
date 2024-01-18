@@ -8,11 +8,69 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"spocker/internal/container/cgroup"
 	"spocker/internal/container/namespace"
 )
+
+// copyLibraries copies shared libraries needed by a binary to the rootfs
+func copyLibraries(t *testing.T, binaryPath, rootfs string) {
+	t.Helper()
+
+	// Get list of libraries using ldd
+	cmd := exec.Command("ldd", binaryPath)
+	output, err := cmd.Output()
+	if err != nil {
+		// Binary might be statically linked, that's ok
+		return
+	}
+
+	// Parse ldd output and copy libraries
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		// Look for lines like: "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6"
+		if strings.Contains(line, "=>") {
+			parts := strings.Split(line, "=>")
+			if len(parts) == 2 {
+				libPath := strings.TrimSpace(parts[1])
+				// Remove address if present
+				libPath = strings.Split(libPath, " ")[0]
+				if libPath != "" && fileExists(libPath) {
+					// Copy library to rootfs maintaining directory structure
+					destPath := filepath.Join(rootfs, libPath)
+					os.MkdirAll(filepath.Dir(destPath), 0755)
+
+					data, err := os.ReadFile(libPath)
+					if err == nil {
+						os.WriteFile(destPath, data, 0755)
+					}
+				}
+			}
+		} else if strings.Contains(line, "/") && !strings.Contains(line, "=>") {
+			// Handle lines like: "/lib64/ld-linux-x86-64.so.2"
+			parts := strings.Fields(line)
+			if len(parts) > 0 {
+				libPath := parts[0]
+				if fileExists(libPath) {
+					destPath := filepath.Join(rootfs, libPath)
+					os.MkdirAll(filepath.Dir(destPath), 0755)
+
+					data, err := os.ReadFile(libPath)
+					if err == nil {
+						os.WriteFile(destPath, data, 0755)
+					}
+				}
+			}
+		}
+	}
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
 
 func TestRunAttachesProcessToCgroup(t *testing.T) {
 	// This test requires root/CAP_SYS_ADMIN
@@ -77,6 +135,26 @@ func TestRunEntersNamespaceContext(t *testing.T) {
 		t.Skip("Test requires root privileges")
 	}
 
+	// Create temporary rootfs with necessary binaries
+	tmpRoot := t.TempDir()
+
+	// Create basic filesystem structure
+	os.MkdirAll(filepath.Join(tmpRoot, "bin"), 0755)
+	os.MkdirAll(filepath.Join(tmpRoot, "lib"), 0755)
+	os.MkdirAll(filepath.Join(tmpRoot, "lib64"), 0755)
+
+	// Copy /bin/sh to rootfs
+	shData, err := os.ReadFile("/bin/sh")
+	if err != nil {
+		t.Fatalf("Failed to read /bin/sh: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(tmpRoot, "bin", "sh"), shData, 0755); err != nil {
+		t.Fatalf("Failed to copy /bin/sh: %v", err)
+	}
+
+	// Copy required libraries for /bin/sh
+	copyLibraries(t, "/bin/sh", tmpRoot)
+
 	nsSpec := &namespace.NamespaceSpec{
 		UTS: true,
 		PID: true,
@@ -90,7 +168,7 @@ func TestRunEntersNamespaceContext(t *testing.T) {
 	cmd := exec.Command("/bin/sh", "-c", "echo $$")
 	cmd.Stdout = &stdout
 
-	err := Run(cmd, nil, nsSpec, "/tmp", nil)
+	err = Run(cmd, nil, nsSpec, tmpRoot, nil)
 	if err != nil {
 		t.Fatalf("Run failed: %v", err)
 	}
@@ -122,14 +200,21 @@ func TestRunChrootsToFilesystem(t *testing.T) {
 	os.MkdirAll(filepath.Join(tmpRoot, "bin"), 0755)
 	os.MkdirAll(filepath.Join(tmpRoot, "proc"), 0755)
 	os.MkdirAll(filepath.Join(tmpRoot, "sys"), 0755)
+	os.MkdirAll(filepath.Join(tmpRoot, "lib"), 0755)
+	os.MkdirAll(filepath.Join(tmpRoot, "lib64"), 0755)
 
-	// Copy /bin/sh to tmpRoot/bin/sh
-	input, err := os.ReadFile("/bin/sh")
-	if err != nil {
-		t.Fatalf("Failed to read /bin/sh: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(tmpRoot, "bin", "sh"), input, 0755); err != nil {
-		t.Fatalf("Failed to copy /bin/sh: %v", err)
+	// Copy /bin/sh and /bin/ls to rootfs
+	for _, binary := range []string{"/bin/sh", "/bin/ls"} {
+		input, err := os.ReadFile(binary)
+		if err != nil {
+			t.Fatalf("Failed to read %s: %v", binary, err)
+		}
+		destPath := filepath.Join(tmpRoot, "bin", filepath.Base(binary))
+		if err := os.WriteFile(destPath, input, 0755); err != nil {
+			t.Fatalf("Failed to copy %s: %v", binary, err)
+		}
+		// Copy libraries needed by this binary
+		copyLibraries(t, binary, tmpRoot)
 	}
 
 	// Run container that lists root directory
@@ -138,7 +223,7 @@ func TestRunChrootsToFilesystem(t *testing.T) {
 	cmd := exec.Command("/bin/sh", "-c", "ls /")
 	cmd.Stdout = &stdout
 
-	err = Run(cmd, nil, nil, tmpRoot, nil)
+	err := Run(cmd, nil, nil, tmpRoot, nil)
 	if err != nil {
 		t.Fatalf("Run failed: %v", err)
 	}

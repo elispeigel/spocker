@@ -30,15 +30,20 @@ func Run(cmd *exec.Cmd, cgroupSpec *cgroup.Spec, namespaceSpec *namespace.Namesp
 			fmt.Printf("Error syncing logger: %v\n", syncErr)
 		}
 	}()
-	// Set up cgroups, namespaces, or any other container settings here
-	subsystems := []cgroup.Subsystem{&cgroup.CPUSubsystem{}, &cgroup.MemorySubsystem{}, &cgroup.BlkIOSubsystem{}}
-	fileHandler := &cgroup.DefaultFileHandler{}
-	factory := cgroup.NewDefaultFactory(subsystems, fileHandler)
-	cgroup, err := factory.CreateCgroup(cgroupSpec)
-	if err != nil {
-		return fmt.Errorf("failed to create cgroup: %v", err)
+	// Set up cgroups if a spec is provided
+	var containerCgroup *cgroup.Cgroup
+	var fileHandler *cgroup.DefaultFileHandler
+	if cgroupSpec != nil {
+		subsystems := []cgroup.Subsystem{&cgroup.CPUSubsystem{}, &cgroup.MemorySubsystem{}, &cgroup.BlkIOSubsystem{}}
+		fileHandler = &cgroup.DefaultFileHandler{}
+		factory := cgroup.NewDefaultFactory(subsystems, fileHandler)
+		var err error
+		containerCgroup, err = factory.CreateCgroup(cgroupSpec)
+		if err != nil {
+			return fmt.Errorf("failed to create cgroup: %v", err)
+		}
+		defer containerCgroup.Close()
 	}
-	defer cgroup.Close()
 
 	// Set up the container's filesystem
 	fs, err := filesystem.NewFilesystem(fsRoot)
@@ -51,23 +56,27 @@ func Run(cmd *exec.Cmd, cgroupSpec *cgroup.Spec, namespaceSpec *namespace.Namesp
 		return fmt.Errorf("failed to prepare filesystem: %v", err)
 	}
 
-	// Set up the container's network
-	networkHandler := network.DefaultNetworkHandler{}
-	container_network, err := network.CreateNetwork(networkConfig, networkHandler)
-	if err != nil {
-		return fmt.Errorf("failed to create network: %v", err)
+	// Set up the container's network if config is provided
+	var container_network *network.Network
+	if networkConfig != nil {
+		networkHandler := network.DefaultNetworkHandler{}
+		var err error
+		container_network, err = network.CreateNetwork(networkConfig, networkHandler)
+		if err != nil {
+			return fmt.Errorf("failed to create network: %v", err)
+		}
+
+		defer func() {
+			err := network.DeleteNetwork(container_network.Name)
+			if err != nil {
+				logger.Error("Failed to delete network", zap.Error(err))
+			}
+		}()
 	}
 
-	defer func() {
-		err := network.DeleteNetwork(container_network.Name)
-		if err != nil {
-			logger.Error("Failed to delete network", zap.Error(err))
-		}
-	}()
-
-	// Configure the container's hostname
+	// Configure the container's hostname (optional, log error but don't fail)
 	if err := namespace.SetHostname("your-container-hostname"); err != nil {
-		return fmt.Errorf("failed to set hostname: %v", err)
+		logger.Warn("Failed to set hostname", zap.Error(err))
 	}
 
 	// Set up the container's root directory (chroot)
@@ -93,8 +102,8 @@ func Run(cmd *exec.Cmd, cgroupSpec *cgroup.Spec, namespaceSpec *namespace.Namesp
 	}
 
 	// Attach the container process to the cgroup
-	if cgroup != nil {
-		if err := cgroup.AddProcess(cmd.Process.Pid, fileHandler); err != nil {
+	if containerCgroup != nil {
+		if err := containerCgroup.AddProcess(cmd.Process.Pid, fileHandler); err != nil {
 			cmd.Process.Kill()
 			return fmt.Errorf("failed to add process to cgroup: %v", err)
 		}

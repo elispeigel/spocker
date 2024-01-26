@@ -26,7 +26,12 @@ func TestDefaultNetworkCIDR(t *testing.T) {
 	}
 
 	// Check that the IP is in the 10.100.x.x range
-	if ip[0] != 10 || ip[1] != 100 {
-		t.Errorf("IP should be in 10.100.x.x range, got %v", ip)
+	// Convert to IPv4 to get correct byte representation
+	ipv4 := ip.To4()
+	if ipv4 == nil {
+		t.Fatal("IP should be IPv4")
+	}
+	if ipv4[0] != 10 || ipv4[1] != 100 {
+		t.Errorf("IP should be in 10.100.x.x range, got %v", ipv4)
 	}
 }

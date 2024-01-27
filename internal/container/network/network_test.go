@@ -231,7 +231,7 @@ func TestConnectToNetwork(t *testing.T) {
 	}
 
 	// Check that the container is assigned the correct IP address
-	addrs, err := netlink.AddrList(nil, netlink.FAMILY_ALL)
+	addrs, err := netlink.AddrList(nil, 0) // FAMILY_ALL
 	if err != nil {
 		t.Fatalf("Failed to get address list: %v", err)
 	}

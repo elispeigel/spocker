@@ -1,15 +1,17 @@
-//go:build integration
-// +build integration
+//go:build linux && integration
+// +build linux,integration
 
 package container
 
 import (
+	"bytes"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
 
 	"spocker/internal/container/cgroup"
+	"spocker/internal/container/namespace"
 )
 
 func TestRunAttachesProcessToCgroup(t *testing.T) {
@@ -67,5 +69,43 @@ func TestRunAttachesProcessToCgroup(t *testing.T) {
 	// Wait for the container to finish
 	if err := <-errChan; err != nil {
 		t.Fatalf("Run failed: %v", err)
+	}
+}
+
+func TestRunEntersNamespaceContext(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("Test requires root privileges")
+	}
+
+	nsSpec := &namespace.NamespaceSpec{
+		UTS: true,
+		PID: true,
+		MNT: true,
+		NET: true,
+	}
+
+	// Run container that reports its PID
+	// In a new PID namespace, the process should see itself as PID 1
+	var stdout bytes.Buffer
+	cmd := exec.Command("/bin/sh", "-c", "echo $$")
+	cmd.Stdout = &stdout
+
+	err := Run(cmd, nil, nsSpec, "/tmp", nil)
+	if err != nil {
+		t.Fatalf("Run failed: %v", err)
+	}
+
+	// Verify the process reported PID 1 (it's in a new PID namespace)
+	output := bytes.TrimSpace(stdout.Bytes())
+	if len(output) == 0 {
+		t.Fatal("Process did not report its PID")
+	}
+
+	// In a new PID namespace, the first process should see itself as PID 1
+	pid := string(output)
+	t.Logf("Process PID output: %s", pid)
+
+	if pid != "1" {
+		t.Errorf("Expected process to see itself as PID 1 in new PID namespace, but got PID %s", pid)
 	}
 }

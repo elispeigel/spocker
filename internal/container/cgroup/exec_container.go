@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 // cgroup package manages Linux control groups (cgroups) and provides functionality to apply resource limitations.
 package cgroup
 
@@ -7,6 +10,8 @@ import (
 	"os"
 	"spocker/internal/container/util"
 	"syscall"
+
+	"golang.org/x/sys/unix"
 )
 
 // ExecContainer runs the container process inside its namespaces.
@@ -18,7 +23,7 @@ func ExecContainer(containerID string, command []string) error {
 		return err
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS | syscall.CLONE_NEWNET,
+		Cloneflags: unix.CLONE_NEWUTS | unix.CLONE_NEWPID | unix.CLONE_NEWNS | unix.CLONE_NEWNET,
 	}
 
 	// Set up cgroup

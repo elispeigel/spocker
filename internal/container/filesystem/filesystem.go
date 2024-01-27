@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 package filesystem
 
 import (
@@ -51,7 +54,10 @@ func NewFilesystem(root string) (*Filesystem, error) {
 
 // Mount mounts the given mount into the filesystem.
 func (fs *Filesystem) Mount(mount *Mount) error {
-	err := syscall.Mount(mount.Source, filepath.Join(fs.Root, mount.Target), mount.FSType, mount.Flags, "")
+	target := filepath.Join(fs.Root, mount.Target)
+	// Note: unix.Mount has a different signature than syscall.Mount on different platforms
+	// For Linux, we use syscall.Mount which matches the signature we need
+	err := syscall.Mount(mount.Source, target, mount.FSType, mount.Flags, "")
 	if err != nil {
 		return fmt.Errorf("failed to mount %s: %v", mount.Target, err)
 	}

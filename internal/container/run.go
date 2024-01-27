@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 package container
 
 import (
@@ -11,6 +14,7 @@ import (
 	"spocker/internal/container/network"
 
 	"go.uber.org/zap"
+	"golang.org/x/sys/unix"
 )
 
 type ContainerRunner interface {
@@ -35,12 +39,6 @@ func Run(cmd *exec.Cmd, cgroupSpec *cgroup.Spec, namespaceSpec *namespace.Namesp
 		return fmt.Errorf("failed to create cgroup: %v", err)
 	}
 	defer cgroup.Close()
-
-	container_namespace, err := namespace.NewNamespace(namespaceSpec)
-	if err != nil {
-		return fmt.Errorf("failed to create namespace: %v", err)
-	}
-	defer container_namespace.Close()
 
 	// Set up the container's filesystem
 	fs, err := filesystem.NewFilesystem(fsRoot)
@@ -68,8 +66,10 @@ func Run(cmd *exec.Cmd, cgroupSpec *cgroup.Spec, namespaceSpec *namespace.Namesp
 	}
 
 	// Set up the container's root directory (chroot)
+	// Use Cloneflags to create namespaces based on spec
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS | syscall.CLONE_NEWNET,
+		Cloneflags:   namespace.BuildCloneFlags(namespaceSpec),
+		Unshareflags: unix.CLONE_NEWNS, // Unshare mount namespace
 	}
 
 	// Set up the container's filesystem before running the command

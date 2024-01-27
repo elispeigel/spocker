@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 package process
 
 import (
@@ -12,6 +15,7 @@ import (
 	"syscall"
 
 	"spocker/internal/container/util"
+	"golang.org/x/sys/unix"
 )
 
 // Process is a struct representing a container process.// Process represents a container process.
@@ -47,8 +51,8 @@ func NewProcess(spec *ProcessSpec) (*Process, error) {
 		return nil, fmt.Errorf("failed to create command: %w", err)
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Cloneflags:   syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS,
-		Unshareflags: syscall.CLONE_NEWNS,
+		Cloneflags:   unix.CLONE_NEWUTS | unix.CLONE_NEWPID | unix.CLONE_NEWNS,
+		Unshareflags: unix.CLONE_NEWNS,
 	}
 
 	return &Process{cmd: cmd}, nil

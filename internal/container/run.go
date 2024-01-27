@@ -80,6 +80,14 @@ func Run(cmd *exec.Cmd, cgroupSpec *cgroup.Spec, namespaceSpec *namespace.Namesp
 		return fmt.Errorf("failed to start command: %v", err)
 	}
 
+	// Attach the container process to the cgroup
+	if cgroup != nil {
+		if err := cgroup.AddProcess(cmd.Process.Pid, fileHandler); err != nil {
+			cmd.Process.Kill()
+			return fmt.Errorf("failed to add process to cgroup: %v", err)
+		}
+	}
+
 	if _, err := cmd.Process.Wait(); err != nil {
 		return fmt.Errorf("failed to wait for command: %v", err)
 	}

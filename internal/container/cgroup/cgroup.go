@@ -98,16 +98,17 @@ func (cg *Cgroup) Remove() error {
 	return nil
 }
 
-// AddProcess adds a process to the cgroup by writing the process ID to the tasks file.
+// AddProcess adds a process to the cgroup by writing the process ID to the cgroup.procs file.
+// Uses cgroup.procs instead of tasks for cgroups v2 compatibility.
 func (cg *Cgroup) AddProcess(pid int, fileHandler FileHandler) error {
-	tasksFilePath := filepath.Join(cg.CgroupRoot, cg.Name, "tasks")
-	tasksFile, err := fileHandler.OpenFile(tasksFilePath, os.O_WRONLY|os.O_APPEND, 0644)
+	procsFilePath := filepath.Join(cg.CgroupRoot, cg.Name, "cgroup.procs")
+	procsFile, err := fileHandler.OpenFile(procsFilePath, os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
-		return fmt.Errorf("failed to open tasks file for cgroup %q: %v", cg.Name, err)
+		return fmt.Errorf("failed to open cgroup.procs file for cgroup %q: %v", cg.Name, err)
 	}
-	defer tasksFile.Close()
+	defer procsFile.Close()
 
-	if _, err := fmt.Fprintf(tasksFile, "%d\n", pid); err != nil {
+	if _, err := fmt.Fprintf(procsFile, "%d\n", pid); err != nil {
 		return fmt.Errorf("failed to add process %d to cgroup %q: %v", pid, cg.Name, err)
 	}
 

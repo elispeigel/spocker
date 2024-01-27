@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 package filesystem
 
 import (
@@ -51,7 +54,10 @@ func NewFilesystem(root string) (*Filesystem, error) {
 
 // Mount mounts the given mount into the filesystem.
 func (fs *Filesystem) Mount(mount *Mount) error {
-	err := syscall.Mount(mount.Source, filepath.Join(fs.Root, mount.Target), mount.FSType, mount.Flags, "")
+	target := filepath.Join(fs.Root, mount.Target)
+	// Note: unix.Mount has a different signature than syscall.Mount on different platforms
+	// For Linux, we use syscall.Mount which matches the signature we need
+	err := syscall.Mount(mount.Source, target, mount.FSType, mount.Flags, "")
 	if err != nil {
 		return fmt.Errorf("failed to mount %s: %v", mount.Target, err)
 	}
@@ -184,4 +190,43 @@ func (fs *Filesystem) GetAbsolutePath(path string) (string, error) {
 		return "", fmt.Errorf("failed to get absolute path for %s: %v", path, err)
 	}
 	return absPath, nil
+}
+
+// ChrootAndMount sets up essential mounts in the rootfs
+func (fs *Filesystem) ChrootAndMount() error {
+	// Create essential directories
+	dirs := []string{"proc", "sys", "dev", "tmp"}
+	for _, dir := range dirs {
+		path := filepath.Join(fs.Root, dir)
+		if err := os.MkdirAll(path, 0755); err != nil {
+			return fmt.Errorf("failed to create %s: %v", dir, err)
+		}
+	}
+
+	// Note: Actual mounting must happen AFTER chroot in child process
+	// We'll need to handle this via a pre-exec hook or init process
+	// For now, just ensure directories exist
+
+	return nil
+}
+
+// MountEssentialFilesystems mounts proc, sys, dev after chroot
+// This should be called from within the container process
+func (fs *Filesystem) MountEssentialFilesystems() error {
+	// Mount proc
+	if err := syscall.Mount("proc", "/proc", "proc", 0, ""); err != nil {
+		return fmt.Errorf("failed to mount proc: %v", err)
+	}
+
+	// Mount sys
+	if err := syscall.Mount("sysfs", "/sys", "sysfs", 0, ""); err != nil {
+		return fmt.Errorf("failed to mount sys: %v", err)
+	}
+
+	// Mount tmpfs on /tmp
+	if err := syscall.Mount("tmpfs", "/tmp", "tmpfs", 0, ""); err != nil {
+		return fmt.Errorf("failed to mount tmpfs: %v", err)
+	}
+
+	return nil
 }

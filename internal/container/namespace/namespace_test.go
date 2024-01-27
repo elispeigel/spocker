@@ -15,8 +15,8 @@ func assertNoError(t *testing.T, err error) {
 
 func TestNewNamespace(t *testing.T) {
 	spec := &NamespaceSpec{
-		Name: "test-namespace",
-		Type: NamespaceTypePID,
+		PID: true,
+		UTS: true,
 	}
 
 	ns, err := NewNamespace(spec)
@@ -26,8 +26,8 @@ func TestNewNamespace(t *testing.T) {
 
 func TestNamespaceEnterAndClose(t *testing.T) {
 	spec := &NamespaceSpec{
-		Name: "test-namespace",
-		Type: NamespaceTypePID,
+		PID: true,
+		UTS: true,
 	}
 
 	ns, err := NewNamespace(spec)

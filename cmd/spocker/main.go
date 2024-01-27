@@ -3,10 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
+	"math/rand"
 	"net"
 	"os"
 	"os/exec"
 	"syscall"
+	"time"
 
 	"spocker/internal/container"
 	"spocker/internal/container/cgroup"
@@ -72,7 +74,7 @@ func parseFlags() (*Config, error) {
 	namespaceTypeFlag := flag.Int("namespace-type", 0, "namespace type for the container")
 	fsRootFlag := flag.String("fs-root", "", "file system root path for the container")
 	networkNameFlag := flag.String("network-name", "", "network name")
-	networkIPCIDRFlag := flag.String("network-ip-cidr", "", "network IP CIDR")
+	networkIPCIDRFlag := flag.String("network-ip-cidr", "", "Network IP CIDR (default: auto-generated in 10.100.x.x/24 range)")
 	networkGatewayFlag := flag.String("network-gateway", "", "network gateway")
 
 	flag.Parse()
@@ -89,6 +91,13 @@ func parseFlags() (*Config, error) {
 		NetworkIPCIDR:  *networkIPCIDRFlag,
 		NetworkGateway: *networkGatewayFlag,
 	}, nil
+}
+
+// getDefaultNetworkCIDR generates a random network CIDR in the 10.100.x.x/24 range
+func getDefaultNetworkCIDR() string {
+	rand.Seed(time.Now().UnixNano())
+	subnet := rand.Intn(255)
+	return fmt.Sprintf("10.100.%d.2/24", subnet)
 }
 
 // runContainer runs a container using the provided configuration and logger.
@@ -108,9 +117,18 @@ func runContainer(config *Config, logger *zap.Logger) {
 		},
 	}
 
+	// Create namespace spec with standard namespaces enabled
 	namespaceSpec := &namespace.NamespaceSpec{
-		Name: config.NamespaceName,
-		Type: config.NamespaceType,
+		UTS: true,
+		PID: true,
+		MNT: true,
+		NET: true,
+	}
+
+	// Apply default network CIDR if not provided
+	if config.NetworkIPCIDR == "" {
+		config.NetworkIPCIDR = getDefaultNetworkCIDR()
+		logger.Info("Using default network CIDR", zap.String("cidr", config.NetworkIPCIDR))
 	}
 
 	_, ipNet, err := net.ParseCIDR(config.NetworkIPCIDR)

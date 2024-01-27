@@ -9,7 +9,6 @@ import (
 
 	"github.com/insomniacslk/dhcp/dhcpv6"
 	"github.com/mdlayher/arp"
-	"github.com/vishvananda/netlink"
 )
 
 func dhcpHandler(conn net.PacketConn, peer net.Addr, m dhcpv6.DHCPv6) {
@@ -136,7 +135,7 @@ func GetDefaultGateway(ipNet *net.IPNet, handler NetworkHandler) (net.IP, error)
 		switch addr := addr.(type) {
 		case *net.IPNet:
 			if addr.Contains(ipNet.IP) {
-				routes, err := handler.RouteList(nil, netlink.FAMILY_ALL)
+				routes, err := handler.RouteList(nil, 0) // FAMILY_ALL
 				if err != nil {
 					return nil, fmt.Errorf("failed to get routes: %w", err)
 				}

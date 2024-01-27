@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 package container
 
 import (
@@ -11,6 +14,7 @@ import (
 	"spocker/internal/container/network"
 
 	"go.uber.org/zap"
+	"golang.org/x/sys/unix"
 )
 
 type ContainerRunner interface {
@@ -26,21 +30,20 @@ func Run(cmd *exec.Cmd, cgroupSpec *cgroup.Spec, namespaceSpec *namespace.Namesp
 			fmt.Printf("Error syncing logger: %v\n", syncErr)
 		}
 	}()
-	// Set up cgroups, namespaces, or any other container settings here
-	subsystems := []cgroup.Subsystem{&cgroup.CPUSubsystem{}, &cgroup.MemorySubsystem{}, &cgroup.BlkIOSubsystem{}}
-	fileHandler := &cgroup.DefaultFileHandler{}
-	factory := cgroup.NewDefaultFactory(subsystems, fileHandler)
-	cgroup, err := factory.CreateCgroup(cgroupSpec)
-	if err != nil {
-		return fmt.Errorf("failed to create cgroup: %v", err)
+	// Set up cgroups if a spec is provided
+	var containerCgroup *cgroup.Cgroup
+	var fileHandler *cgroup.DefaultFileHandler
+	if cgroupSpec != nil {
+		subsystems := []cgroup.Subsystem{&cgroup.CPUSubsystem{}, &cgroup.MemorySubsystem{}, &cgroup.BlkIOSubsystem{}}
+		fileHandler = &cgroup.DefaultFileHandler{}
+		factory := cgroup.NewDefaultFactory(subsystems, fileHandler)
+		var err error
+		containerCgroup, err = factory.CreateCgroup(cgroupSpec)
+		if err != nil {
+			return fmt.Errorf("failed to create cgroup: %v", err)
+		}
+		defer containerCgroup.Close()
 	}
-	defer cgroup.Close()
-
-	container_namespace, err := namespace.NewNamespace(namespaceSpec)
-	if err != nil {
-		return fmt.Errorf("failed to create namespace: %v", err)
-	}
-	defer container_namespace.Close()
 
 	// Set up the container's filesystem
 	fs, err := filesystem.NewFilesystem(fsRoot)
@@ -48,36 +51,62 @@ func Run(cmd *exec.Cmd, cgroupSpec *cgroup.Spec, namespaceSpec *namespace.Namesp
 		return fmt.Errorf("failed to create filesystem: %v", err)
 	}
 
-	// Set up the container's network
-	networkHandler := network.DefaultNetworkHandler{}
-	container_network, err := network.CreateNetwork(networkConfig, networkHandler)
-	if err != nil {
-		return fmt.Errorf("failed to create network: %v", err)
+	// Prepare the filesystem by creating essential directories
+	if err := fs.ChrootAndMount(); err != nil {
+		return fmt.Errorf("failed to prepare filesystem: %v", err)
 	}
 
-	defer func() {
-		err := network.DeleteNetwork(container_network.Name)
+	// Set up the container's network if config is provided
+	var container_network *network.Network
+	if networkConfig != nil {
+		networkHandler := network.DefaultNetworkHandler{}
+		var err error
+		container_network, err = network.CreateNetwork(networkConfig, networkHandler)
 		if err != nil {
-			logger.Error("Failed to delete network", zap.Error(err))
+			return fmt.Errorf("failed to create network: %v", err)
 		}
-	}()
 
-	// Configure the container's hostname
+		defer func() {
+			err := network.DeleteNetwork(container_network.Name)
+			if err != nil {
+				logger.Error("Failed to delete network", zap.Error(err))
+			}
+		}()
+	}
+
+	// Configure the container's hostname (optional, log error but don't fail)
 	if err := namespace.SetHostname("your-container-hostname"); err != nil {
-		return fmt.Errorf("failed to set hostname: %v", err)
+		logger.Warn("Failed to set hostname", zap.Error(err))
 	}
 
 	// Set up the container's root directory (chroot)
+	// Use Cloneflags to create namespaces based on spec
+	// NOTE: Using Chroot here. Essential filesystem mounts (proc, sys, dev)
+	// require either:
+	// 1. A container init process that mounts before exec
+	// 2. Using cmd with a wrapper that calls MountEssentialFilesystems
+	// Current implementation creates mount points but doesn't mount
+	// TODO: Implement proper init process for complete filesystem isolation
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS | syscall.CLONE_NEWNET,
+		Cloneflags:   namespace.BuildCloneFlags(namespaceSpec),
+		Unshareflags: unix.CLONE_NEWNS, // Unshare mount namespace
+		Chroot:       fs.Root,
 	}
 
-	// Set up the container's filesystem before running the command
-	cmd.Dir = fs.Root
+	// Set the working directory to / after chroot
+	cmd.Dir = "/"
 
 	// Run the command inside the container
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start command: %v", err)
+	}
+
+	// Attach the container process to the cgroup
+	if containerCgroup != nil {
+		if err := containerCgroup.AddProcess(cmd.Process.Pid, fileHandler); err != nil {
+			cmd.Process.Kill()
+			return fmt.Errorf("failed to add process to cgroup: %v", err)
+		}
 	}
 
 	if _, err := cmd.Process.Wait(); err != nil {

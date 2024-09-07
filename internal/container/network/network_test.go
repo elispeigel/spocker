@@ -171,14 +171,14 @@ func TestDeleteNetwork(t *testing.T) {
 	}
 	defer func() {
 		// Clean up the test network after the test
-		err := DeleteNetwork(ifName)
+		err := DeleteNetwork(&Network{Name: ifName})
 		if err != nil {
 			t.Fatalf("Failed to delete test network: %v", err)
 		}
 	}()
 
 	// Call the function to be tested
-	err = DeleteNetwork(ifName)
+	err = DeleteNetwork(&Network{Name: ifName})
 
 	// Check that the error returned is nil
 	if err != nil {

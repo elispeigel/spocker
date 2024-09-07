@@ -4,29 +4,32 @@ import (
 	"net"
 	"time"
 
+	"github.com/containernetworking/cni/libcni"
 	"github.com/vishvananda/netlink"
 )
 
-// Config represents the configuration for a container network, including properties like its name, IP network, gateway, DNS, and DHCP-related details.
 type Config struct {
-	Name     string
-	IPNet    *net.IPNet
-	Gateway  net.IP
-	DNS      []net.IP
-	DHCP     bool
-	DHCPArgs []string
+	Name           string
+	IPNet          *net.IPNet
+	Gateway        net.IP
+	DNS            []net.IP
+	DHCP           bool
+	DHCPArgs       []string
+	CNIPlugins     []*libcni.NetworkConfig
+	CNIPluginPaths []string
+	CNIConfigJSON  string
+	RuntimeConfig  *libcni.RuntimeConf
 }
 
-// Network is an abstraction over a container network, containing properties such as its name, IP network, gateway, DNS, and whether it uses DHCP.
 type Network struct {
-	Name    string
-	IPNet   *net.IPNet
-	Gateway net.IP
-	DNS     []net.IP
-	DHCP    bool
+	Name       string
+	IPNet      *net.IPNet
+	Gateway    net.IP
+	DNS        []net.IP
+	DHCP       bool
+	CNINetwork *libcni.NetworkConfig
 }
 
-// NetworkHandler defines the methods required for a network handler to interact with and manage container networks.
 type NetworkHandler interface {
 	InterfaceByName(name string) (*net.Interface, error)
 	RouteList(link netlink.Link, family int) ([]netlink.Route, error)
@@ -35,10 +38,8 @@ type NetworkHandler interface {
 	Addrs(*net.Interface) ([]net.Addr, error)
 }
 
-// DefaultNetworkHandler is an empty placeholder for the default implementation of the NetworkHandler interface
 type DefaultNetworkHandler struct{}
 
-// Answer represents a DNS answer, containing the name, type, time-to-live (TTL), and data of the DNS response.
 type Answer struct {
 	Name string
 	Type uint16
@@ -46,7 +47,6 @@ type Answer struct {
 	Data string
 }
 
-// dnsHeader represents the header of a DNS message, containing various fields such as id, flags, and count fields for question, answer, authority, and additional records.
 type dnsHeader struct {
 	id      uint16
 	qr      byte

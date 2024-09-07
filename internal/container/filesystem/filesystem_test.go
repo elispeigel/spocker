@@ -20,7 +20,7 @@ func TestNewFilesystem(t *testing.T) {
 		defer os.RemoveAll(rootDir)
 
 		// Test that a valid root directory creates a new filesystem object
-		fs, err := NewFilesystem(rootDir)
+		fs, err := NewFilesystem(&Config{Root: rootDir})
 		if err != nil {
 			t.Fatalf("failed to create filesystem object: %v", err)
 		}
@@ -49,7 +49,7 @@ func TestNewFilesystem(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to remove invalid root dir: %v", err)
 		}
-		_, err = NewFilesystem(invalidDir)
+		_, err = NewFilesystem(&Config{Root: invalidDir})
 		if err == nil {
 			t.Errorf("expected error for invalid root directory, but got nil")
 		}
@@ -66,7 +66,7 @@ func TestMountUnmount(t *testing.T) {
 		defer os.RemoveAll(root)
 
 		// Create a new Filesystem object
-		fs, err := NewFilesystem(root)
+		fs, err := NewFilesystem(&Config{Root: root})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -137,7 +137,7 @@ func TestCreateRemoveDir(t *testing.T) {
 		}
 		defer os.RemoveAll(root)
 		// Create new Filesystem object with temporary directory as root
-		fs := &Filesystem{Root: root}
+		fs := &Filesystem{Config: Config{Root: root}}
 
 		// Create a directory and verify that it was created
 		dirPath := "test-dir"
@@ -159,7 +159,7 @@ func TestCreateRemoveDir(t *testing.T) {
 }
 
 func TestCreateRemoveFile(t *testing.T) {
-	fs, err := NewFilesystem("/tmp")
+	fs, err := NewFilesystem(&Config{Root: "/tmp"})
 	if err != nil {
 		t.Fatalf("failed to create filesystem: %v", err)
 	}
@@ -190,7 +190,7 @@ func TestCreateRemoveFile(t *testing.T) {
 }
 
 func TestCopyFile(t *testing.T) {
-	fs, err := NewFilesystem("/tmp")
+	fs, err := NewFilesystem(&Config{Root: "/tmp"})
 	if err != nil {
 		t.Fatalf("failed to create filesystem: %v", err)
 	}
@@ -241,7 +241,7 @@ func TestSetFileOwnership(t *testing.T) {
 	defer os.RemoveAll(rootDir)
 
 	// Create a new filesystem object
-	fs, err := NewFilesystem(rootDir)
+	fs, err := NewFilesystem(&Config{Root: rootDir})
 	if err != nil {
 		t.Fatalf("failed to create filesystem: %v", err)
 	}
@@ -283,7 +283,7 @@ func TestSetFilePermissions(t *testing.T) {
 	defer os.RemoveAll(rootDir)
 
 	// Create a new filesystem object
-	fs, err := NewFilesystem(rootDir)
+	fs, err := NewFilesystem(&Config{Root: rootDir})
 	if err != nil {
 		t.Fatalf("failed to create filesystem: %v", err)
 	}
@@ -316,7 +316,7 @@ func TestSetFilePermissions(t *testing.T) {
 
 func TestGetAbsolutePath(t *testing.T) {
 	// Create a new filesystem with a root directory
-	fs, err := NewFilesystem("/tmp")
+	fs, err := NewFilesystem(&Config{Root: "/tmp"})
 	if err != nil {
 		t.Errorf("NewFilesystem failed with error: %v", err)
 	}

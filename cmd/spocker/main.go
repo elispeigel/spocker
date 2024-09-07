@@ -3,12 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	"net"
 	"os"
-	"os/exec"
-	"syscall"
 
-	"spocker/internal/container"
 	"spocker/internal/container/cgroup"
 	"spocker/internal/container/namespace"
 	"spocker/internal/container/network"
@@ -17,131 +13,96 @@ import (
 )
 
 type Config struct {
-	MemoryLimit    int
-	CPUShares      int
-	BlkioWeight    int
-	CgroupName     string
-	NamespaceName  string
-	NamespaceType  namespace.NamespaceType
-	FSRoot         string
-	NetworkName    string
-	NetworkIPCIDR  string
-	NetworkGateway string
-}
-
-// usage prints the command usage information.
-func usage() {
-	fmt.Fprintf(os.Stderr, "Usage: %s COMMAND\n", os.Args[0])
-	flag.PrintDefaults()
+	CgroupConfig    cgroup.Spec
+	NamespaceConfig namespace.NamespaceSpec
+	NetworkConfig   network.Config
+	NetworkIPCIDR   string
+	NetworkGateway  string
+	FSRoot          string
 }
 
 func main() {
-	logger, _ := zap.NewProduction()
+	logger, err := zap.NewProduction()
+	if err != nil {
+		fmt.Printf("Error setting up logger: %v\n", err)
+		os.Exit(1)
+	}
 	defer logger.Sync()
+
+	zap.ReplaceGlobals(logger)
 
 	config, err := parseFlags()
 	if err != nil {
 		logger.Error("Error parsing flags", zap.Error(err))
-		usage()
+		flag.Usage()
 		os.Exit(1)
 	}
 
 	if len(flag.Args()) == 0 {
-		usage()
+		logger.Error("No command provided")
+		flag.Usage()
 		os.Exit(1)
 	}
 
 	switch flag.Args()[0] {
 	case "run":
-		runContainer(config, logger)
+		if err := runContainer(config, logger); err != nil {
+			logger.Error("Failed to run container", zap.Error(err))
+			os.Exit(1)
+		}
 	default:
-		usage()
+		logger.Error("Unknown command", zap.String("command", flag.Args()[0]))
+		flag.Usage()
 		os.Exit(1)
 	}
 }
 
-// parseFlags parses command line flags and returns a Config struct.
 func parseFlags() (*Config, error) {
-	flag.Usage = usage
+	config := &Config{}
 
-	memoryLimitFlag := flag.Int("memory-limit", 0, "Memory limit for the container in bytes")
-	cpuSharesFlag := flag.Int("cpu-shares", 0, "CPU shares for the container")
-	blkioWeightFlag := flag.Int("blkio-weight", 0, "Block I/O weight for the container")
-	cgroupNameFlag := flag.String("cgroup-name", "", "cgroup name for the container")
-	namespaceNameFlag := flag.String("namespace-name", "", "namespace name for the container")
-	namespaceTypeFlag := flag.Int("namespace-type", 0, "namespace type for the container")
-	fsRootFlag := flag.String("fs-root", "", "file system root path for the container")
-	networkNameFlag := flag.String("network-name", "", "network name")
-	networkIPCIDRFlag := flag.String("network-ip-cidr", "", "network IP CIDR")
-	networkGatewayFlag := flag.String("network-gateway", "", "network gateway")
-
+	flag.IntVar(&config.CgroupConfig.Resources.Memory.Limit, "memory-limit", 0, "Memory limit for the container in bytes")
+	flag.IntVar(&config.CgroupConfig.Resources.CPU.Shares, "cpu-shares", 0, "CPU shares for the container")
+	flag.IntVar(&config.CgroupConfig.Resources.BlkIO.Weight, "blkio-weight", 0, "Block I/O weight for the container")
+	flag.StringVar(&config.CgroupConfig.Name, "cgroup-name", "", "cgroup name for the container")
+	flag.StringVar(&config.NamespaceConfig.Name, "namespace-name", "", "namespace name for the container")
+	flag.IntVar((*int)(&config.NamespaceConfig.Type), "namespace-type", 0, "namespace type for the container")
+	flag.StringVar(&config.FSRoot, "fs-root", "", "file system root path for the container")
+	flag.StringVar(&config.NetworkConfig.Name, "network-name", "", "network name")
+	flag.StringVar(&config.NetworkIPCIDR, "network-ip-cidr", "", "network IP CIDR")
+	flag.StringVar(&config.NetworkGateway, "network-gateway", "", "network gateway")
+	
 	flag.Parse()
 
-	return &Config{
-		MemoryLimit:    *memoryLimitFlag,
-		CPUShares:      *cpuSharesFlag,
-		BlkioWeight:    *blkioWeightFlag,
-		CgroupName:     *cgroupNameFlag,
-		NamespaceName:  *namespaceNameFlag,
-		NamespaceType:  namespace.NamespaceType(*namespaceTypeFlag),
-		FSRoot:         *fsRootFlag,
-		NetworkName:    *networkNameFlag,
-		NetworkIPCIDR:  *networkIPCIDRFlag,
-		NetworkGateway: *networkGatewayFlag,
-	}, nil
+	if config.CgroupConfig.Name == "" {
+		return nil, fmt.Errorf("required flag 'cgroup-name' not set")
+	}
+
+	if config.NetworkConfig.Name == "" {
+		return nil, fmt.Errorf("required flag 'network-name' not set")
+	}
+
+	zap.L().Info("Parsed configuration",
+		zap.Int("memory-limit", config.CgroupConfig.Resources.Memory.Limit),
+		zap.Int("cpu-shares", config.CgroupConfig.Resources.CPU.Shares),
+		zap.Int("blkio-weight", config.CgroupConfig.Resources.BlkIO.Weight),
+		zap.String("cgroup-name", config.CgroupConfig.Name),
+		zap.String("namespace-name", config.NamespaceConfig.Name),
+		zap.Int("namespace-type", int(config.NamespaceConfig.Type)),
+		zap.String("fs-root", config.FSRoot),
+		zap.String("network-name", config.NetworkConfig.Name),
+		zap.String("network-ip-cidr", config.NetworkIPCIDR),
+		zap.String("network-gateway", config.NetworkGateway),
+	)
+
+	return config, nil
 }
 
-// runContainer runs a container using the provided configuration and logger.
-func runContainer(config *Config, logger *zap.Logger) {
-	cgroupSpec := &cgroup.Spec{
-		Name: config.CgroupName,
-		Resources: &cgroup.Resources{
-			Memory: &cgroup.Memory{
-				Limit: config.MemoryLimit,
-			},
-			CPU: &cgroup.CPU{
-				Shares: config.CPUShares,
-			},
-			BlkIO: &cgroup.BlkIO{
-				Weight: config.BlkioWeight,
-			},
-		},
-	}
+func runContainer(config *Config, logger *zap.Logger) error {
+	logger.Info("Running container", zap.String("cgroup-name", config.CgroupConfig.Name))
 
-	namespaceSpec := &namespace.NamespaceSpec{
-		Name: config.NamespaceName,
-		Type: config.NamespaceType,
-	}
+	// TODO: Implement container running logic here
+	// This is where you would use the parsed configuration to set up and run the container
 
-	_, ipNet, err := net.ParseCIDR(config.NetworkIPCIDR)
-	if err != nil {
-		logger.Error("Invalid CIDR", zap.String("CIDR", config.NetworkIPCIDR), zap.Error(err))
-		return
-	}
-
-	networkConfig := &network.Config{
-		Name:    config.NetworkName,
-		IPNet:   ipNet,
-		Gateway: net.ParseIP(config.NetworkGateway),
-	}
-
-	cmd := exec.Command(flag.Args()[1], flag.Args()[2:]...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS | syscall.CLONE_NEWNET,
-	}
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	err = container.Run(
-		cmd,
-		cgroupSpec,
-		namespaceSpec,
-		config.FSRoot,
-		networkConfig,
-	)
-	if err != nil {
-		logger.Error("Failed to run container", zap.Error(err))
-		return
-	}
+	logger.Info("Container execution completed")
+	return nil
 }

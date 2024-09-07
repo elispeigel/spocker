@@ -6,11 +6,12 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"strings"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 // GetDefaultDNS returns the default DNS IP address.
@@ -18,8 +19,8 @@ func GetDefaultDNS() (net.IP, error) {
 	// Open the resolv.conf file
 	file, err := os.Open("/etc/resolv.conf")
 	if err != nil {
-		log.Printf("Error opening resolv.conf: %v", err)
-		return nil, err
+		zap.L().Error("Failed to open resolv.conf", zap.Error(err))
+		return nil, fmt.Errorf("failed to open resolv.conf: %w", err)
 	}
 	defer file.Close()
 
@@ -39,8 +40,8 @@ func GetDefaultDNS() (net.IP, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
-		log.Printf("Error reading resolv.conf: %v", err)
-		return nil, err
+		zap.L().Error("Failed to read resolv.conf", zap.Error(err))
+		return nil, fmt.Errorf("failed to read resolv.conf: %w", err)
 	}
 
 	return nil, nil
@@ -70,7 +71,7 @@ func configureDNS(containerID, dns string) error {
 	// Set a read timeout for the response
 	err = udpConn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	if err != nil {
-		return fmt.Errorf("failed to set a read timeout for the response: %w", err)
+		return fmt.Errorf("failed to set read timeout for DNS response: %w", err)
 	}
 
 	// Read the DNS response
@@ -89,7 +90,7 @@ func configureDNS(containerID, dns string) error {
 	// Process the DNS response
 	for _, answer := range answers {
 		if answer.Type == 1 {
-			fmt.Printf("IPv4 address for %s: %s\n", answer.Name, answer.Data)
+			zap.L().Info("DNS response", zap.String("name", answer.Name), zap.String("ipv4", answer.Data))
 		}
 	}
 
@@ -99,15 +100,15 @@ func configureDNS(containerID, dns string) error {
 func parseDNSResponse(response []byte) ([]Answer, error) {
 	header, err := parseHeader(response)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse DNS header: %w", err)
 	}
 
 	if header.qr == 0 {
-		return nil, errors.New("not a response")
+		return nil, errors.New("DNS response is not a response")
 	}
 
 	if header.rcode != 0 {
-		return nil, fmt.Errorf("error in RCODE %d", header.rcode)
+		return nil, fmt.Errorf("DNS response has non-zero RCODE: %d", header.rcode)
 	}
 
 	offset := 12
@@ -125,7 +126,7 @@ func parseDNSResponse(response []byte) ([]Answer, error) {
 		var err error
 		answers[i], offset, err = readAnswer(response, offset)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read answer: %w", err)
+			return nil, fmt.Errorf("failed to read DNS answer: %w", err)
 		}
 	}
 
@@ -143,7 +144,7 @@ func readDomainName(data []byte, offset int) (string, int, error) {
 			compressedOffset := int(binary.BigEndian.Uint16(data[offset:offset+2])) & 0x3FFF
 			compressedName, _, err := readDomainName(data, compressedOffset)
 			if err != nil {
-				return "", offset, err
+				return "", offset, fmt.Errorf("failed to read compressed domain name: %w", err)
 			}
 			name = append(name, compressedName)
 			offset += 2
@@ -161,7 +162,7 @@ func readDomainName(data []byte, offset int) (string, int, error) {
 func readAnswer(data []byte, offset int) (Answer, int, error) {
 	name, end, err := readDomainName(data, offset)
 	if err != nil {
-		return Answer{}, offset, err
+		return Answer{}, offset, fmt.Errorf("failed to read domain name: %w", err)
 	}
 	rtype := binary.BigEndian.Uint16(data[end : end+2])
 	rdlength := binary.BigEndian.Uint16(data[end+8 : end+10])
@@ -174,7 +175,7 @@ func readAnswer(data []byte, offset int) (Answer, int, error) {
 	case 28: // AAAA
 		addr = net.IP(rdata).String()
 	default:
-		return Answer{}, end + 10 + int(rdlength), fmt.Errorf("unsupported record type: %d", rtype)
+		return Answer{}, end + 10 + int(rdlength), fmt.Errorf("unsupported DNS record type: %d", rtype)
 	}
 
 	return Answer{
@@ -216,7 +217,7 @@ func createDNSQuery(domain string, qtype uint16) ([]byte, error) {
 
 func parseHeader(response []byte) (dnsHeader, error) {
 	if len(response) < 12 {
-		return dnsHeader{}, errors.New("response too short")
+		return dnsHeader{}, errors.New("DNS response too short")
 	}
 
 	header := response[:12]

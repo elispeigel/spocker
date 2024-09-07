@@ -44,7 +44,7 @@ func ExecContainer(containerID string, command []string) error {
 	}
 	defer cgroup.Close()
 
-	if err := cgroup.AddProcess(os.Getpid(), fileHandler); err != nil {
+	if err := cgroup.AddProcess(os.Getpid()); err != nil {
 		return err
 	}
 	defer cgroup.Close()

@@ -1,21 +1,21 @@
-// cgroup package manages Linux control groups (cgroups) and provides functionality to apply resource limitations.
 package cgroup
 
 import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"go.uber.org/zap"
 )
 
 // FindCgroupMountpoint returns the mountpoint of the cgroup hierarchy with the given subsystem.
 func FindCgroupMountpoint(subsystem string, fileHandler FileHandler) (string, error) {
 	f, err := fileHandler.OpenFile("/proc/self/mountinfo", os.O_RDONLY, 0)
 	if err != nil {
-		return "", fmt.Errorf("failed to open mountinfo: %v", err)
+		return "", fmt.Errorf("failed to open mountinfo: %w", err)
 	}
 	defer f.Close()
 	s := bufio.NewScanner(f)
@@ -34,7 +34,7 @@ func FindCgroupMountpoint(subsystem string, fileHandler FileHandler) (string, er
 	}
 
 	if err := s.Err(); err != nil {
-		return "", fmt.Errorf("failed to scan mountinfo: %v", err)
+		return "", fmt.Errorf("failed to scan mountinfo: %w", err)
 	}
 
 	return "", fmt.Errorf("cgroup subsystem %s not found", subsystem)
@@ -57,7 +57,7 @@ func GetCgroupParam(cgroupPath string, param string, fileHandler FileHandler) (s
 	filePath := filepath.Join(cgroupPath, param)
 	valueBytes, err := fileHandler.ReadFile(filePath)
 	if err != nil {
-		return "", fmt.Errorf("failed to read cgroup parameter %s: %v", param, err)
+		return "", fmt.Errorf("failed to read cgroup parameter %s: %w", param, err)
 	}
 	return string(bytes.TrimSpace(valueBytes)), nil
 }
@@ -70,13 +70,13 @@ func SetCgroupParam(cgroupPath string, param string, value string, fileHandler F
 	paramFile := filepath.Join(cgroupPath, param)
 	file, err := fileHandler.OpenFile(paramFile, os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
-		return fmt.Errorf("failed to open cgroup parameter file: %v", err)
+		return fmt.Errorf("failed to open cgroup parameter file: %w", err)
 	}
 	defer file.Close()
 
 	_, err = file.WriteString(value)
 	if err != nil {
-		return fmt.Errorf("failed to write cgroup parameter value: %v", err)
+		return fmt.Errorf("failed to write cgroup parameter value: %w", err)
 	}
 
 	return nil
@@ -104,10 +104,10 @@ func MustLimitMemory(maxMemory int64) {
 	cgroup, err := factory.CreateCgroup(cgroupSpec)
 
 	if err != nil {
-		log.Fatalf("failed to create cgroup: %v", err)
+		zap.L().Fatal("Failed to create cgroup", zap.Error(err))
 	}
 	defer cgroup.Close()
 	if err := cgroup.Set(memoryLimitControl, fmt.Sprintf("%d", maxMemory)); err != nil {
-		log.Fatalf("failed to set %s for cgroup %s: %v", memoryLimitControl, cgroupSpec.Name, err)
+		zap.L().Fatal("Failed to set memory limit for cgroup", zap.String("cgroupName", cgroupSpec.Name), zap.Error(err))
 	}
 }

@@ -6,43 +6,30 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
 
+	"go.uber.org/zap"
 	"spocker/internal/container/util"
 )
 
-// Process is a struct representing a container process.// Process represents a container process.
+// Process represents a container process.
 type Process struct {
 	cmd *exec.Cmd
-}
-
-type ProcessHandler interface {
-	Getpid() int
-	FindProcess(pid int) (*os.Process, error)
-	Getppid() int
-}
-
-type DefaultProcessHandler struct{}
-
-func (dph DefaultProcessHandler) Getpid() int {
-	return syscall.Getpid()
-}
-
-func (dph DefaultProcessHandler) FindProcess(pid int) (*os.Process, error) {
-	return os.FindProcess(pid)
-}
-
-func (dph DefaultProcessHandler) Getppid() int {
-	return syscall.Getppid()
 }
 
 // NewProcess creates a new container process based on the given ProcessSpec.
 func NewProcess(spec *ProcessSpec) (*Process, error) {
 	ctx := context.Background()
 	cmd, err := util.CreateCommand(ctx, spec.Path, spec.Args...)
+
+	if err := dropPrivileges(spec); err != nil {
+		return nil, fmt.Errorf("failed to drop privileges: %w", err)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to create command: %w", err)
 	}
@@ -54,9 +41,42 @@ func NewProcess(spec *ProcessSpec) (*Process, error) {
 	return &Process{cmd: cmd}, nil
 }
 
+
+func dropPrivileges(spec *ProcessSpec) error {
+	if spec.User != "" {
+		userInfo, err := user.Lookup(spec.User)
+		if err != nil {
+			return fmt.Errorf("failed to look up user %s: %w", spec.User, err)
+		}
+
+		uid, err := strconv.Atoi(userInfo.Uid)
+		if err != nil {
+			return fmt.Errorf("failed to parse UID: %w", err)
+		}
+
+		gid, err := strconv.Atoi(userInfo.Gid)
+		if err != nil {
+			return fmt.Errorf("failed to parse GID: %w", err)
+		}
+
+		if err := syscall.Setgid(gid); err != nil {
+			return fmt.Errorf("failed to set GID: %w", err)
+		}
+
+		if err := syscall.Setuid(uid); err != nil {
+			return fmt.Errorf("failed to set UID: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // Start begins the execution of the container process.
 func (p *Process) Start() error {
-	return p.cmd.Start()
+	if err := p.cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start container process: %w", err)
+	}
+	return nil
 }
 
 // Wait waits for the container process to exit and returns its exit code.
@@ -78,13 +98,17 @@ func (p *Process) Wait() (int, error) {
 
 // Kill sends a signal to the container process.
 func (p *Process) Kill(sig os.Signal) error {
-	return p.cmd.Process.Signal(sig)
+	if err := p.cmd.Process.Signal(sig); err != nil {
+		return fmt.Errorf("failed to send signal to container process: %w", err)
+	}
+	return nil
 }
 
 // ProcessSpec defines the specification for a container process.
 type ProcessSpec struct {
 	Path string
 	Args []string
+	User string
 }
 
 // GetInitProcess returns the init process for the current system.
@@ -98,9 +122,13 @@ func GetInitProcess() (*os.Process, error) {
 		}
 		statFile, err := os.Open(statPath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to open %s: %v", statPath, err)
+			return nil, fmt.Errorf("failed to open %s: %w", statPath, err)
 		}
-		defer statFile.Close()
+		defer func() {
+			if err := statFile.Close(); err != nil {
+				zap.L().Error("Failed to close stat file", zap.String("path", statPath), zap.Error(err))
+			}
+		}()
 
 		scanner := bufio.NewScanner(statFile)
 		scanner.Scan()
@@ -114,7 +142,7 @@ func GetInitProcess() (*os.Process, error) {
 		if statFields[0] == "1" {
 			initPid, err := strconv.Atoi(statFields[0])
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse init PID: %v", err)
+				return nil, fmt.Errorf("failed to parse init PID: %w", err)
 			}
 			return os.FindProcess(initPid)
 		}
@@ -122,7 +150,7 @@ func GetInitProcess() (*os.Process, error) {
 		// The parent PID is the fourth field in the stat file.
 		ppid, err := strconv.Atoi(statFields[3])
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse parent PID: %v", err)
+			return nil, fmt.Errorf("failed to parse parent PID: %w", err)
 		}
 
 		// If the parent PID is 0, then we've reached the root process.

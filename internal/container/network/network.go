@@ -1,16 +1,17 @@
 package network
 
 import (
-	"crypto/rand"
 	"fmt"
-	"log"
-	"math/big"
 	"net"
 	"time"
+	"math/big"
+	"crypto/rand"
+	"syscall"
 
-	"github.com/insomniacslk/dhcp/dhcpv6"
-	"github.com/insomniacslk/dhcp/dhcpv6/server6"
 	"github.com/vishvananda/netlink"
+	"github.com/containernetworking/cni/libcni"
+	"github.com/insomniacslk/dhcp/dhcpv6/server6"
+	"go.uber.org/zap"
 )
 
 func (dnh DefaultNetworkHandler) InterfaceByName(name string) (*net.Interface, error) {
@@ -33,6 +34,10 @@ func (dnh DefaultNetworkHandler) Addrs(iface *net.Interface) ([]net.Addr, error)
 	return iface.Addrs()
 }
 
+func dhcpHandler(conn net.PacketConn, peer net.Addr, m dhcpv6.DHCPv6) {
+	// Add your DHCP handling logic here
+}
+
 // CreateNetwork creates a new container network.
 func CreateNetwork(config *Config, handler NetworkHandler) (*Network, error) {
 	if config == nil || config.IPNet == nil {
@@ -40,7 +45,7 @@ func CreateNetwork(config *Config, handler NetworkHandler) (*Network, error) {
 	}
 
 	if _, err := handler.InterfaceByName(config.Name); err == nil {
-		return nil, fmt.Errorf("network already exists: %w", err)
+		return nil, fmt.Errorf("network %s already exists: %w", config.Name, err)
 	}
 
 	if config.DHCP {
@@ -50,15 +55,18 @@ func CreateNetwork(config *Config, handler NetworkHandler) (*Network, error) {
 		}
 		server, err := server6.NewServer("", laddr, dhcpHandler)
 		if err != nil {
+			zap.L().Error("Failed to create DHCP server", zap.Error(err))
 			return nil, fmt.Errorf("failed to create DHCP server: %w", err)
 		}
 
 		if err := server.Serve(); err != nil {
+			zap.L().Error("Failed to start DHCP server", zap.Error(err))
 			return nil, fmt.Errorf("failed to start DHCP server: %w", err)
 		}
 	} else {
 		ip, err := GetAvailableIP(config.IPNet, handler)
 		if err != nil {
+			zap.L().Error("Failed to assign IP address to container", zap.Error(err))
 			return nil, fmt.Errorf("failed to assign IP address to container: %w", err)
 		}
 		config.IPNet.IP = ip
@@ -68,6 +76,7 @@ func CreateNetwork(config *Config, handler NetworkHandler) (*Network, error) {
 	if gateway == nil {
 		defaultGateway, err := GetDefaultGateway(config.IPNet, handler)
 		if err != nil {
+			zap.L().Error("Failed to get default gateway", zap.Error(err))
 			return nil, fmt.Errorf("failed to get default gateway: %w", err)
 		}
 		gateway = defaultGateway
@@ -77,6 +86,7 @@ func CreateNetwork(config *Config, handler NetworkHandler) (*Network, error) {
 	if dns == nil {
 		defaultDNS, err := GetDefaultDNS()
 		if err != nil {
+			zap.L().Error("Failed to get default DNS", zap.Error(err))
 			return nil, fmt.Errorf("failed to get default DNS: %w", err)
 		}
 		dns = []net.IP{defaultDNS}
@@ -88,6 +98,14 @@ func CreateNetwork(config *Config, handler NetworkHandler) (*Network, error) {
 		Gateway: gateway,
 		DNS:     dns,
 		DHCP:    config.DHCP,
+	}
+
+	if config.CNIPlugins != nil {
+		cniNetwork, err := SetupCNINetwork(config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to set up CNI network: %w", err)
+		}
+		network.CNINetwork = cniNetwork
 	}
 
 	return network, nil
@@ -105,6 +123,7 @@ func GetAvailableIP(ipNet *net.IPNet, handler NetworkHandler) (net.IP, error) {
 		// Generate a random IP address within the subnet range
 		randInt, err := rand.Int(rand.Reader, ipSpace)
 		if err != nil {
+			zap.L().Error("Failed to generate random IP address", zap.Error(err))
 			return nil, fmt.Errorf("failed to generate random IP address: %w", err)
 		}
 		ipInt := big.NewInt(0).Add(randInt, big.NewInt(0).SetBytes(ipRange.To16()))
@@ -120,23 +139,30 @@ func GetAvailableIP(ipNet *net.IPNet, handler NetworkHandler) (net.IP, error) {
 }
 
 // DeleteNetwork deletes an existing container network.
-func DeleteNetwork(networkName string) error {
-	iface, err := net.InterfaceByName(networkName)
+func DeleteNetwork(network *Network) error {
+	if network.CNINetwork != nil {
+		if err := CleanupCNINetwork(network.CNINetwork); err != nil {
+			zap.L().Error("Failed to clean up CNI network", zap.Error(err))
+		}
+	}
+
+	iface, err := net.InterfaceByName(network.Name)
 	if err != nil {
-		return err
+		zap.L().Error("Failed to get network interface", zap.String("network.Name", network.Name), zap.Error(err))
+		return fmt.Errorf("failed to get network interface %s: %w", network.Name, err)
 	}
 
 	link, err := netlink.LinkByIndex(iface.Index)
 	if err != nil {
-		return err
+		zap.L().Error("Failed to get network link", zap.String("network.Name", network.Name), zap.Error(err))
+		return fmt.Errorf("failed to get network link for %s: %w", network.Name, err)
 	}
 
 	err = netlink.LinkDel(link)
 	if err != nil {
-		return err
+		zap.L().Error("Failed to delete network", zap.String("network.Name", network.Name), zap.Error(err))
+		return fmt.Errorf("failed to delete network %s: %w", network.Name, err)
 	}
-
-	log.Printf("Deleted network %s\n", networkName)
 
 	return nil
 }
@@ -149,19 +175,22 @@ func ConnectToNetwork(containerID string, network *Network) error {
 
 	iface, err := net.InterfaceByName(network.Name)
 	if err != nil {
-		return fmt.Errorf("network not found: %w", err)
+		zap.L().Error("Network not found", zap.String("network.Name", network.Name), zap.Error(err))
+		return fmt.Errorf("network %s not found: %w", network.Name, err)
 	}
 
 	link, err := netlink.LinkByIndex(iface.Index)
 	if err != nil {
-		return fmt.Errorf("failed to get network link: %w", err)
+		zap.L().Error("Failed to get network link", zap.String("network.Name", network.Name), zap.Error(err))
+		return fmt.Errorf("failed to get network link for %s: %w", network.Name, err)
 	}
 
 	ipAddr := &netlink.Addr{
 		IPNet: network.IPNet,
 	}
 	if err := netlink.AddrAdd(link, ipAddr); err != nil {
-		return fmt.Errorf("failed to assign IP address to container: %w", err)
+		zap.L().Error("Failed to assign IP address to container", zap.String("containerID", containerID), zap.Error(err))
+		return fmt.Errorf("failed to assign IP address to container %s: %w", containerID, err)
 	}
 
 	if network.Gateway != nil {
@@ -170,43 +199,48 @@ func ConnectToNetwork(containerID string, network *Network) error {
 			Gw:  network.Gateway,
 		}
 		if err := netlink.RouteAdd(defaultRoute); err != nil {
-			return fmt.Errorf("failed to add default route: %w", err)
+			zap.L().Error("Failed to add default route", zap.String("containerID", containerID), zap.Error(err))
+			return fmt.Errorf("failed to add default route for container %s: %w", containerID, err)
 		}
 	}
 
 	if network.DNS != nil && len(network.DNS) > 0 {
 		dns := network.DNS[0].String()
 		if err := configureDNS(containerID, dns); err != nil {
-			return fmt.Errorf("failed to configure DNS: %w", err)
+			zap.L().Error("Failed to configure DNS", zap.String("containerID", containerID), zap.Error(err))
+			return fmt.Errorf("failed to configure DNS for container %s: %w", containerID, err)
 		}
 	}
 
-	log.Printf("Container %s connected to network %s", containerID, network.Name)
+	zap.L().Info("Container connected to network", zap.String("containerID", containerID), zap.String("network.Name", network.Name))
 
 	return nil
 }
 
 // DisconnectFromNetwork disconnects a container from a network.
 func DisconnectFromNetwork(containerID, networkName string) error {
-	if networkName == "" {
+	if network.Name == "" {
 		return fmt.Errorf("invalid network name")
 	}
 
-	iface, err := net.InterfaceByName(networkName)
+	iface, err := net.InterfaceByName(network.Name)
 	if err != nil {
-		return fmt.Errorf("network not found: %w", err)
+		zap.L().Error("Network not found", zap.String("network.Name", network.Name), zap.Error(err))
+		return fmt.Errorf("network %s not found: %w", network.Name, err)
 	}
 
 	link, err := netlink.LinkByIndex(iface.Index)
 	if err != nil {
-		return fmt.Errorf("failed to get network link: %w", err)
+		zap.L().Error("Failed to get network link", zap.String("network.Name", network.Name), zap.Error(err))
+		return fmt.Errorf("failed to get network link for %s: %w", network.Name, err)
 	}
 
 	if err := netlink.LinkSetDown(link); err != nil {
-		return fmt.Errorf("failed to bring down network link: %w", err)
+		zap.L().Error("Failed to bring down network link", zap.String("network.Name", network.Name), zap.Error(err))
+		return fmt.Errorf("failed to bring down network link for %s: %w", network.Name, err)
 	}
 
-	log.Printf("Container %s disconnected from network %s", containerID, networkName)
+	zap.L().Info("Container disconnected from network", zap.String("containerID", containerID), zap.String("network.Name", network.Name))
 
 	return nil
 }

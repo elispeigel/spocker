@@ -6,6 +6,7 @@ import (
 	"os"
 	"syscall"
 
+	"go.uber.org/zap"
 	"spocker/internal/container/util"
 )
 
@@ -19,7 +20,7 @@ func NewNamespace(spec *NamespaceSpec) (*Namespace, error) {
 	ctx := context.Background()
 	cmd, err := util.CreateCommand(ctx, "/proc/self/exe", "child")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create child process: %w", err)
+		return nil, fmt.Errorf("failed to create child process command: %w", err)
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Cloneflags:   syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS,
@@ -40,7 +41,11 @@ func NewNamespace(spec *NamespaceSpec) (*Namespace, error) {
 		File: file,
 	}
 
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			zap.L().Error("Failed to close namespace file", zap.Error(err))
+		}
+	}()
 
 	return ns, nil
 }
@@ -61,7 +66,7 @@ func (ns *Namespace) Enter() error {
 	ctx := context.Background()
 	cmd, err := util.CreateCommand(ctx, "/bin/sh", "-i")
 	if err != nil {
-		return fmt.Errorf("failed to create command: %w", err)
+		return fmt.Errorf("failed to create shell command: %w", err)
 	}
 
 	if err := cmd.Run(); err != nil {
@@ -101,11 +106,10 @@ type NamespaceSpec struct {
 
 // SetHostname sets the hostname of the current namespace and returns an error if it fails.
 func SetHostname(hostname string) error {
-
 	ctx := context.Background()
 	cmd, err := util.CreateCommand(ctx, "sudo", "hostnamectl", "set-hostname", hostname)
 	if err != nil {
-		return fmt.Errorf("failed to create command: %w", err)
+		return fmt.Errorf("failed to create set hostname command: %w", err)
 	}
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to set hostname to %s: %w", hostname, err)

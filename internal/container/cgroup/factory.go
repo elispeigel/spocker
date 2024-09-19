@@ -1,23 +1,32 @@
-// cgroup package manages Linux control groups (cgroups) and provides functionality to apply resource limitations.
+// internal/container/cgroup/factory.go
 package cgroup
 
 import (
 	"fmt"
-
-	"go.uber.org/zap"
 )
 
-// NewDefaultFactory returns a new instance of DefaultFactory with the specified subsystems.
-func NewDefaultFactory(subsystems []Subsystem, fileHandler FileHandler) *DefaultFactory {
-	return &DefaultFactory{subsystems: subsystems, fileHandler: fileHandler}
+func NewCPUSubsystem() *CPUSubsystem {
+	return &CPUSubsystem{}
 }
 
-// CreateCgroup creates a new Cgroup instance based on the provided Spec, using the DefaultFactory's subsystems and fileHandler. Returns an error if the creation fails.
-func (f *DefaultFactory) CreateCgroup(spec *Spec) (*Cgroup, error) {
-	cgroup, err := NewCgroup(spec, f.subsystems, f.fileHandler)
+func NewMemorySubsystem() *MemorySubsystem {
+	return &MemorySubsystem{}
+}
+
+func NewBlkIOSubsystem() *BlkIOSubsystem {
+	return &BlkIOSubsystem{}
+}
+
+func setSubsystemValue(fileHandler FileHandler, subsystemPath, filename string, value int) error {
+	subsystemFile, err := fileHandler.OpenFile(filepath.Join(subsystemPath, filename), os.O_WRONLY, 0644)
 	if err != nil {
-		zap.L().Error("failed to create cgroup", zap.Error(err))
-		return nil, fmt.Errorf("failed to create cgroup: %v", err)
+		zap.L().Error("Failed to open cgroup subsystem file", zap.String("filename", filename), zap.Error(err))
+		return fmt.Errorf("failed to open %s for cgroup: %w", filename, err)
 	}
-	return cgroup, nil
+	defer subsystemFile.Close()
+	if _, err := fmt.Fprintf(subsystemFile, "%d", value); err != nil {
+		zap.L().Error("Failed to set cgroup subsystem value", zap.String("filename", filename), zap.Error(err))
+		return fmt.Errorf("failed to set %s value for cgroup: %w", filename, err)
+	}
+	return nil
 }

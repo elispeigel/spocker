@@ -1,3 +1,4 @@
+// internal/container/cgroup/cgroup.go
 package cgroup
 
 import (
@@ -8,8 +9,40 @@ import (
 	"go.uber.org/zap"
 )
 
-// NewCgroup returns a new cgroup object based on the given specification.
-// The cgroup will be created with the specified name, and resources will be limited according to the given resource allocation.
+type Cgroup struct {
+	Name        string
+	File        *os.File
+	CgroupRoot  string
+	fileHandler FileHandler
+}
+
+type Factory interface {
+	CreateCgroup(spec *Spec) (*Cgroup, error)
+}
+
+type DefaultFactory struct {
+	subsystems  []Subsystem
+	fileHandler FileHandler
+}
+
+func NewDefaultFactory(subsystems []Subsystem, fileHandler FileHandler) *DefaultFactory {
+	return &DefaultFactory{subsystems: subsystems, fileHandler: fileHandler}
+}
+
+func (f *DefaultFactory) CreateCgroup(spec *Spec) (*Cgroup, error) {
+	cgroup, err := NewCgroup(spec, f.subsystems, f.fileHandler)
+	if err != nil {
+		zap.L().Error("failed to create cgroup", zap.Error(err))
+		return nil, fmt.Errorf("failed to create cgroup: %v", err)
+	}
+	return cgroup, nil
+}
+
+type Subsystem interface {
+	Name() string
+	ApplySettings(cgroupPath string, resources *Resources) error
+}
+
 func NewCgroup(spec *Spec, subsystems []Subsystem, fileHandler FileHandler) (*Cgroup, error) {
 	cgroupRoot := spec.CgroupRoot
 	if cgroupRoot == "" {
@@ -18,62 +51,65 @@ func NewCgroup(spec *Spec, subsystems []Subsystem, fileHandler FileHandler) (*Cg
 	cgroupPath := filepath.Join(cgroupRoot, spec.Name)
 	if err := fileHandler.MkdirAll(cgroupPath, 0755); err != nil {
 		zap.L().Error("Failed to create cgroup directory", zap.String("cgroupPath", cgroupPath), zap.Error(err))
-		return nil, fmt.Errorf("failed to create cgroup directory %q: %w", cgroupPath, err)
+		return nil, fmt.Errorf("failed to create cgroup directory %q: %v", cgroupPath, err)
 	}
 
-	tasksFile, err := createTasksFile(cgroupPath, spec.Name, fileHandler)
-	if err != nil {
-		return nil, err
-	}
-
-	err = addSubsystems(cgroupRoot, subsystems, spec.Resources, fileHandler)
-	if err != nil {
-		return nil, err
-	}
-
-	return createCgroup(spec.Name, tasksFile, cgroupRoot, fileHandler), nil
-}
-
-func createTasksFile(cgroupPath, cgroupName string, fileHandler FileHandler) (*os.File, error) {
 	tasksFilePath := filepath.Join(cgroupPath, "tasks")
 	tasksFile, err := fileHandler.OpenFile(tasksFilePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
-		zap.L().Error("Failed to create tasks file for cgroup", zap.String("cgroupName", cgroupName), zap.Error(err))
-		return nil, fmt.Errorf("failed to create tasks file for cgroup %q: %w", cgroupName, err)
+		zap.L().Error("Failed to create tasks file for cgroup", zap.String("cgroupName", spec.Name), zap.Error(err))
+		return nil, fmt.Errorf("failed to create tasks file for cgroup %q: %v", spec.Name, err)
 	}
-	return tasksFile, nil
-}
 
-func addSubsystems(cgroupRoot string, subsystems []Subsystem, resources *Resources, fileHandler FileHandler) error {
 	for _, subsystem := range subsystems {
-		subsystemPath := filepath.Join(cgroupRoot, subsystem.Name())
+		subsystemPath := filepath.Join(cgroupRoot, subsystem.Name(), spec.Name)
 
-		// Create subsystem directory if it doesn't exist
 		if err := fileHandler.MkdirAll(subsystemPath, 0755); err != nil {
 			zap.L().Error("Failed to create subsystem directory", zap.String("subsystemPath", subsystemPath), zap.Error(err))
-			return fmt.Errorf("failed to create subsystem directory %q: %w", subsystemPath, err)
+			return nil, fmt.Errorf("failed to create subsystem directory %q: %v", subsystemPath, err)
 		}
 
-		if err := subsystem.ApplySettings(subsystemPath, resources); err != nil {
-			zap.L().Error("Failed to apply subsystem settings", zap.String("subsystemPath", subsystemPath), zap.Error(err))
-			return fmt.Errorf("failed to apply settings for subsystem %q: %w", subsystem.Name(), err)
+		if err := subsystem.ApplySettings(subsystemPath, spec.Resources); err != nil {
+			zap.L().Error("Failed to apply subsystem settings", zap.String("subsystem", subsystem.Name()), zap.Error(err))
+			return nil, err
+		}
+	}
+
+	return &Cgroup{
+		Name:        spec.Name,
+		File:        tasksFile,
+		CgroupRoot:  cgroupRoot,
+		fileHandler: fileHandler,
+	}, nil
+}
+
+func (cg *Cgroup) AddProcess(pid int) error {
+	if _, err := fmt.Fprintf(cg.File, "%d\n", pid); err != nil {
+		zap.L().Error("Failed to add process to cgroup", zap.Int("pid", pid), zap.String("cgroupName", cg.Name), zap.Error(err))
+		return fmt.Errorf("failed to add process %d to cgroup %q: %w", pid, cg.Name, err)
+	}
+	return nil
+}
+
+func (cg *Cgroup) SetResourceLimits(resources *Resources) error {
+	if resources.Memory != nil && resources.Memory.Limit > 0 {
+		if err := cg.Set("memory.limit_in_bytes", fmt.Sprintf("%d", resources.Memory.Limit)); err != nil {
+			return fmt.Errorf("failed to set memory limit: %w", err)
+		}
+	}
+	if resources.CPU != nil && resources.CPU.Shares > 0 {
+		if err := cg.Set("cpu.shares", fmt.Sprintf("%d", resources.CPU.Shares)); err != nil {
+			return fmt.Errorf("failed to set CPU shares: %w", err)
+		}
+	}
+	if resources.BlkIO != nil && resources.BlkIO.Weight > 0 {
+		if err := cg.Set("blkio.weight", fmt.Sprintf("%d", resources.BlkIO.Weight)); err != nil {
+			return fmt.Errorf("failed to set Block I/O weight: %w", err)
 		}
 	}
 	return nil
 }
 
-func createCgroup(cgroupName string, tasksFile *os.File, cgroupRoot string, fileHandler FileHandler) *Cgroup {
-	return &Cgroup{
-		Name:        cgroupName,
-		File:        tasksFile,
-		CgroupRoot:  cgroupRoot,
-		fileHandler: fileHandler,
-	}
-}
-
-// Set sets the value of the specified control for the cgroup.
-// This function takes a control (e.g. "memory.limit_in_bytes") and a value (e.g. "1024") as arguments,
-// and writes the value to the control file.
 func (cg *Cgroup) Set(control string, value string) error {
 	controlFile := filepath.Join(cg.CgroupRoot, cg.Name, control)
 	f, err := cg.fileHandler.OpenFile(controlFile, os.O_WRONLY|os.O_TRUNC, 0644)
@@ -89,8 +125,6 @@ func (cg *Cgroup) Set(control string, value string) error {
 	return nil
 }
 
-// Close releases the cgroup's resources.
-// This function closes the file descriptor for the cgroup's tasks file.
 func (cg *Cgroup) Close() error {
 	if err := cg.File.Close(); err != nil {
 		zap.L().Error("Failed to close cgroup file", zap.Error(err))
@@ -99,22 +133,11 @@ func (cg *Cgroup) Close() error {
 	return nil
 }
 
-// Remove deletes the cgroup after closing its resources.
-// This function removes the cgroup directory from the filesystem.
 func (cg *Cgroup) Remove() error {
 	cgroupPath := filepath.Join(cg.CgroupRoot, cg.Name)
 	if err := cg.fileHandler.RemoveAll(cgroupPath); err != nil {
 		zap.L().Error("Failed to remove cgroup directory", zap.String("cgroupPath", cgroupPath), zap.Error(err))
 		return fmt.Errorf("failed to remove cgroup directory %q: %w", cgroupPath, err)
-	}
-	return nil
-}
-
-// AddProcess adds a process to the cgroup by writing the process ID to the tasks file.
-func (cg *Cgroup) AddProcess(pid int) error {
-	if _, err := fmt.Fprintf(cg.File, "%d\n", pid); err != nil {
-		zap.L().Error("Failed to add process to cgroup", zap.Int("pid", pid), zap.String("cgroupName", cg.Name), zap.Error(err))
-		return fmt.Errorf("failed to add process %d to cgroup %q: %w", pid, cg.Name, err)
 	}
 	return nil
 }
